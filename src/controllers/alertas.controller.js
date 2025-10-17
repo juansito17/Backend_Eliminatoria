@@ -1,4 +1,5 @@
 const Alerta = require('../models/alerta.model');
+const pool = require('../config/database'); // Importar la conexión a la base de datos
 const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 
 // Obtener todas las alertas

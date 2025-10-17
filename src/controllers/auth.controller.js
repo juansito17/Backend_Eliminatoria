@@ -24,7 +24,8 @@ exports.login = async (req, res) => {
             user: {
                 id: user.id_usuario,
                 rol: user.id_rol,
-                email: user.email
+                email: user.email,
+                username: user.username // Incluir el username aquí
             }
         };
 
@@ -71,7 +72,7 @@ exports.register = async (req, res) => {
 };
 
 // Middleware para verificar el token
-exports.verifyToken = (req, res) => {
+exports.verifyToken = async (req, res) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
@@ -81,7 +82,9 @@ exports.verifyToken = (req, res) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey');
         req.user = decoded.user;
-        res.json({ user: req.user, message: 'Token válido' });
+        // Asegúrate de que el user devuelto contenga el username
+        const userWithUsername = await authModel.findUserById(req.user.id); // Asumiendo que authModel tiene findUserById
+        res.json({ user: { ...req.user, username: userWithUsername.username }, message: 'Token válido' });
     } catch (error) {
         res.status(401).json({ message: 'Token no es válido', error: error.message });
     }
