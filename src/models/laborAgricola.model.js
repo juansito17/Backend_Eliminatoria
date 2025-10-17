@@ -47,3 +47,9 @@ exports.delete = async (id) => {
     const [result] = await pool.query('DELETE FROM labores_agricolas WHERE id_labor = ?', [id]);
     return result.affectedRows;
 };
+
+// Obtener todas las labores agrícolas registradas por un usuario específico
+exports.findAllByUserId = async (userId) => {
+    const [rows] = await pool.query('SELECT * FROM labores_agricolas WHERE id_usuario_registro = ?', [userId]);
+    return rows;
+};

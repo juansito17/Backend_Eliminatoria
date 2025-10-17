@@ -4,7 +4,14 @@ const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 // Obtener todas las labores agrícolas
 exports.getLaboresAgricolas = async (req, res) => {
     try {
-        const laboresAgricolas = await LaborAgricola.findAll();
+        let laboresAgricolas;
+        // Si el usuario es un Operario (rol 3), solo puede ver sus propias labores
+        if (req.user.rol === 3) {
+            laboresAgricolas = await LaborAgricola.findAllByUserId(req.user.id);
+        } else {
+            // Administradores (rol 1) y Supervisores (rol 2) pueden ver todas las labores
+            laboresAgricolas = await LaborAgricola.findAll();
+        }
         res.json(laboresAgricolas);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener labores agrícolas', error: error.message });
@@ -19,6 +26,12 @@ exports.getLaborAgricolaById = async (req, res) => {
         if (!laborAgricola) {
             return res.status(404).json({ message: 'Labor agrícola no encontrada' });
         }
+
+        // Si el usuario es un Operario (rol 3), solo puede ver sus propias labores
+        if (req.user.rol === 3 && laborAgricola.id_usuario_registro !== req.user.id) {
+            return res.status(403).json({ message: 'Acceso denegado: No tiene permisos para ver esta labor' });
+        }
+
         res.json(laborAgricola);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener labor agrícola', error: error.message });
