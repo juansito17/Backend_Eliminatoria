@@ -8,6 +8,7 @@ const laboresTiposRoutes = require('./routes/laboresTipos.routes');
 const laboresAgricolasRoutes = require('./routes/laboresAgricolas.routes');
 const alertasRoutes = require('./routes/alertas.routes');
 const dashboardProduccionDiariaRoutes = require('./routes/dashboardProduccionDiaria.routes');
+const authRoutes = require('./routes/auth.routes'); // Importar las rutas de autenticación
 
 // Middlewares
 app.use(express.json()); // Para parsear JSON en las peticiones
@@ -16,6 +17,9 @@ app.use(express.json()); // Para parsear JSON en las peticiones
 app.get('/', (req, res) => {
     res.send('API de Agricultura de Precisión');
 });
+
+// Rutas de Autenticación
+app.use('/api/auth', authRoutes);
 
 // Rutas de Usuarios
 app.use('/api/usuarios', usuariosRoutes);
