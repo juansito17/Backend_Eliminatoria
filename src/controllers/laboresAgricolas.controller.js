@@ -12,7 +12,23 @@ exports.getLaboresAgricolas = async (req, res) => {
             // Administradores (rol 1) y Supervisores (rol 2) pueden ver todas las labores
             laboresAgricolas = await LaborAgricola.findAll();
         }
-        res.json(laboresAgricolas);
+
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const laboresFormateadas = laboresAgricolas.map(labor => ({
+            id: labor.id_labor,
+            fecha: labor.fecha_labor,
+            cultivo: labor.nombre_cultivo || 'Sin cultivo', // Usar nombre si está disponible
+            lote: labor.nombre_lote || 'Sin lote',
+            trabajador: labor.nombre_completo || 'Sin trabajador',
+            tipoLabor: labor.nombre_labor || 'Sin tipo',
+            cantidadRecolectada: labor.cantidad_recolectada,
+            peso: labor.peso_kg,
+            hora: labor.fecha_labor ? new Date(labor.fecha_labor).toTimeString().slice(0, 5) : '',
+            ubicacionGPS: labor.ubicacion_gps_punto,
+            id_usuario_registro: labor.id_usuario_registro
+        }));
+
+        res.json({ labores: laboresFormateadas });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener labores agrícolas', error: error.message });
     }

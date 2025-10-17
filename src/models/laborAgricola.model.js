@@ -2,7 +2,19 @@ const pool = require('../config/database');
 
 // Obtener todas las labores agrícolas
 exports.findAll = async () => {
-    const [rows] = await pool.query('SELECT * FROM labores_agricolas');
+    const [rows] = await pool.query(`
+        SELECT
+            la.*,
+            c.nombre_cultivo,
+            t.nombre_completo,
+            lt.nombre_labor,
+            l.nombre_lote
+        FROM labores_agricolas la
+        LEFT JOIN cultivos c ON la.id_cultivo = c.id_cultivo
+        LEFT JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
+        LEFT JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
+        LEFT JOIN lotes l ON la.id_lote = l.id_lote
+    `);
     return rows;
 };
 
@@ -50,6 +62,19 @@ exports.delete = async (id) => {
 
 // Obtener todas las labores agrícolas registradas por un usuario específico
 exports.findAllByUserId = async (userId) => {
-    const [rows] = await pool.query('SELECT * FROM labores_agricolas WHERE id_usuario_registro = ?', [userId]);
+    const [rows] = await pool.query(`
+        SELECT
+            la.*,
+            c.nombre_cultivo,
+            t.nombre_completo,
+            lt.nombre_labor,
+            l.nombre_lote
+        FROM labores_agricolas la
+        LEFT JOIN cultivos c ON la.id_cultivo = c.id_cultivo
+        LEFT JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
+        LEFT JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
+        LEFT JOIN lotes l ON la.id_lote = l.id_lote
+        WHERE la.id_usuario_registro = ?
+    `, [userId]);
     return rows;
 };

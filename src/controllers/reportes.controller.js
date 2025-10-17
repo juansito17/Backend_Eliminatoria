@@ -2,6 +2,296 @@ const pool = require('../config/database');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
+// Función para obtener producción diaria agregada
+exports.getProduccionDiaria = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+
+        let whereConditions = [];
+        let queryParams = [];
+
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+        const [rows] = await pool.query(`
+            SELECT
+                DATE(la.fecha_labor) as fecha,
+                SUM(la.cantidad_recolectada) as cantidad_total,
+                SUM(la.peso_kg) as peso_total,
+                COUNT(*) as numero_labores,
+                c.nombre_cultivo
+            FROM labores_agricolas la
+            JOIN cultivos c ON la.id_cultivo = c.id_cultivo
+            ${whereClause}
+            GROUP BY DATE(la.fecha_labor), c.nombre_cultivo
+            ORDER BY fecha DESC
+        `, queryParams);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error al obtener producción diaria:', error);
+        res.status(500).json({ message: 'Error al obtener producción diaria', error: error.message });
+    }
+};
+
+// Función para obtener rendimiento por lote
+exports.getRendimientoLote = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+
+        let whereConditions = [];
+        let queryParams = [];
+
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+        const [rows] = await pool.query(`
+            SELECT
+                l.nombre_lote,
+                c.nombre_cultivo,
+                SUM(la.cantidad_recolectada) as cantidad_total,
+                SUM(la.peso_kg) as peso_total,
+                AVG(la.cantidad_recolectada) as promedio_cantidad,
+                COUNT(*) as numero_labores
+            FROM labores_agricolas la
+            JOIN cultivos c ON la.id_cultivo = c.id_cultivo
+            JOIN lotes l ON la.id_lote = l.id_lote
+            ${whereClause}
+            GROUP BY l.nombre_lote, c.nombre_cultivo
+            ORDER BY peso_total DESC
+        `, queryParams);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error al obtener rendimiento por lote:', error);
+        res.status(500).json({ message: 'Error al obtener rendimiento por lote', error: error.message });
+    }
+};
+
+// Función para obtener eficiencia por trabajador
+exports.getEficienciaTrabajador = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+
+        let whereConditions = [];
+        let queryParams = [];
+
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+        const [rows] = await pool.query(`
+            SELECT
+                t.nombre_completo as trabajador,
+                COUNT(*) as numero_labores,
+                SUM(la.cantidad_recolectada) as cantidad_total,
+                SUM(la.peso_kg) as peso_total,
+                AVG(la.cantidad_recolectada) as promedio_cantidad,
+                SUM(la.costo_aproximado) as costo_total
+            FROM labores_agricolas la
+            JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
+            ${whereClause}
+            GROUP BY t.nombre_completo
+            ORDER BY peso_total DESC
+        `, queryParams);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error al obtener eficiencia por trabajador:', error);
+        res.status(500).json({ message: 'Error al obtener eficiencia por trabajador', error: error.message });
+    }
+};
+
+// Función para obtener histórico de labores
+exports.getHistoricoLabores = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+
+        let whereConditions = [];
+        let queryParams = [];
+
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+        const [rows] = await pool.query(`
+            SELECT
+                DATE(la.fecha_labor) as fecha,
+                lt.nombre_labor,
+                COUNT(*) as numero_labores,
+                SUM(la.cantidad_recolectada) as cantidad_total,
+                SUM(la.peso_kg) as peso_total
+            FROM labores_agricolas la
+            JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
+            ${whereClause}
+            GROUP BY DATE(la.fecha_labor), lt.nombre_labor
+            ORDER BY fecha ASC
+        `, queryParams);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error al obtener histórico de labores:', error);
+        res.status(500).json({ message: 'Error al obtener histórico de labores', error: error.message });
+    }
+};
+
+// Función para obtener labores detalladas con filtros y paginación
+exports.getLaboresDetallado = async (req, res) => {
+    try {
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId, page = 1, limit = 10 } = req.query;
+
+        let whereConditions = [];
+        let queryParams = [];
+        let paramIndex = 0;
+
+        if (fechaInicio) {
+            whereConditions.push(`la.fecha_labor >= ?`);
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push(`la.fecha_labor <= ?`);
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push(`la.id_cultivo = ?`);
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push(`la.id_labor_tipo = ?`);
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push(`la.id_trabajador = ?`);
+            queryParams.push(trabajadorId);
+        }
+
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+        // Obtener total de registros para paginación
+        const [totalRows] = await pool.query(`
+            SELECT COUNT(*) as total
+            FROM labores_agricolas la
+            ${whereClause}
+        `, queryParams);
+
+        const offset = (page - 1) * limit;
+
+        // Obtener datos paginados
+        const [rows] = await pool.query(`
+            SELECT
+                la.fecha_labor,
+                lt.nombre_labor,
+                c.nombre_cultivo,
+                l.nombre_lote,
+                t.nombre_completo AS trabajador,
+                la.cantidad_recolectada,
+                la.peso_kg,
+                la.costo_aproximado,
+                u.nombre AS usuario_registro
+            FROM labores_agricolas la
+            JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
+            JOIN cultivos c ON la.id_cultivo = c.id_cultivo
+            JOIN lotes l ON la.id_lote = l.id_lote
+            JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
+            JOIN usuarios u ON la.id_usuario_registro = u.id_usuario
+            ${whereClause}
+            ORDER BY la.fecha_labor DESC
+            LIMIT ? OFFSET ?
+        `, [...queryParams, parseInt(limit), offset]);
+
+        res.json({
+            data: rows,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: totalRows[0].total,
+                pages: Math.ceil(totalRows[0].total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener labores detalladas:', error);
+        res.status(500).json({ message: 'Error al obtener labores detalladas', error: error.message });
+    }
+};
+
 // Generar reporte de labores agrícolas en PDF
 exports.generateLaboresPdf = async (req, res) => {
     try {

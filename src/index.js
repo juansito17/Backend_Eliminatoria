@@ -5,7 +5,7 @@ const pool = require('./config/database'); // Se usarรก mรกs adelante pa
 const socket = require('./socket'); // Importar el mรณdulo de socket
 const alertasController = require('./controllers/alertas.controller'); // Importar el controlador de alertas
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Crear servidor HTTP
 const server = http.createServer(app);

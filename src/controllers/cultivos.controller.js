@@ -4,7 +4,12 @@ const Cultivo = require('../models/cultivo.model');
 exports.getCultivos = async (req, res) => {
     try {
         const cultivos = await Cultivo.findAll();
-        res.json(cultivos);
+        // Mapear los campos de la base de datos a los nombres esperados por el frontend
+        const cultivosFormateados = cultivos.map(cultivo => ({
+            id: cultivo.id_cultivo,
+            nombre: cultivo.nombre_cultivo
+        }));
+        res.json({ cultivos: cultivosFormateados });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener cultivos', error: error.message });
     }

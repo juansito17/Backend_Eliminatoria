@@ -20,11 +20,10 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
         `);
         const trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
 
-        // Cultivos Activos (ejemplo: contar cultivos con labores hoy)
+        // Cultivos Activos (contar todos los cultivos existentes)
         const [cultivosActivosResult] = await pool.query(`
-            SELECT COUNT(DISTINCT id_cultivo) AS cultivos_activos
-            FROM labores_agricolas
-            WHERE DATE(fecha_labor) = CURDATE();
+            SELECT COUNT(*) AS cultivos_activos
+            FROM cultivos
         `);
         const cultivos_activos = cultivosActivosResult[0].cultivos_activos || 0;
 
@@ -58,12 +57,12 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
         }
         
         res.json({
-            total_peso_kg: parseFloat(total_peso_kg).toFixed(2),
+            total_peso_kg: parseFloat(total_peso_kg), // Enviar como número
             trabajadores_activos: parseInt(trabajadores_activos),
             cultivos_activos: parseInt(cultivos_activos),
             rendimiento_por_lote: rendimiento_por_lote,
-            costo_total_aproximado: parseFloat(costo_total_aproximado).toFixed(2),
-            eficiencia_porcentaje: parseFloat(eficiencia_porcentaje).toFixed(2) // Formatear a 2 decimales
+            costo_total_aproximado: parseFloat(costo_total_aproximado), // Enviar como número
+            eficiencia_porcentaje: parseFloat(eficiencia_porcentaje) // Enviar como número
         });
 
     } catch (error) {
@@ -113,10 +112,15 @@ exports.getHistoricalData = async (req, res) => {
             ORDER BY periodo DESC;
         `);
 
-        // Aquí se podrían añadir cálculos de variación, proyecciones, etc.
-        // Por ahora, se devuelve la data agregada por el período seleccionado.
+        const historicalDataFormateada = historicalData.map(item => ({
+            periodo: item.periodo,
+            total_peso_kg: parseFloat(item.total_peso_kg || 0),
+            trabajadores_unicos: parseInt(item.trabajadores_unicos || 0),
+            productividad_promedio_dia: parseFloat(item.productividad_promedio_dia || 0),
+            costo_total_aproximado: parseFloat(item.costo_total_aproximado || 0)
+        }));
 
-        res.json(historicalData);
+        res.json(historicalDataFormateada);
 
     } catch (error) {
         console.error('Error al obtener datos históricos del dashboard:', error);

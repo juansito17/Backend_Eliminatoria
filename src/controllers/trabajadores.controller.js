@@ -4,7 +4,12 @@ const Trabajador = require('../models/trabajador.model');
 exports.getTrabajadores = async (req, res) => {
     try {
         const trabajadores = await Trabajador.findAll();
-        res.json(trabajadores);
+        // Mapear los campos de la base de datos a los nombres esperados por el frontend
+        const trabajadoresFormateados = trabajadores.map(trabajador => ({
+            id: trabajador.id_trabajador,
+            nombre: trabajador.nombre_completo
+        }));
+        res.json({ trabajadores: trabajadoresFormateados });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener trabajadores', error: error.message });
     }

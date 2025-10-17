@@ -4,7 +4,17 @@ const Usuario = require('../models/usuario.model');
 exports.getUsuarios = async (req, res) => {
     try {
         const usuarios = await Usuario.findAll();
-        res.json(usuarios);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const usuariosFormateados = usuarios.map(usuario => ({
+            id: usuario.id_usuario,
+            rol: usuario.id_rol,
+            username: usuario.nombre_usuario,
+            email: usuario.email,
+            activo: usuario.activo,
+            fecha_creacion: usuario.fecha_creacion,
+            ultimo_acceso: usuario.ultimo_acceso
+        }));
+        res.json({ usuarios: usuariosFormateados });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener usuarios', error: error.message });
     }
@@ -18,7 +28,19 @@ exports.getUsuarioById = async (req, res) => {
         if (!usuario) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
-        res.json(usuario);
+
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const usuarioFormateado = {
+            id: usuario.id_usuario,
+            rol: usuario.id_rol,
+            username: usuario.nombre_usuario,
+            email: usuario.email,
+            activo: usuario.activo,
+            fecha_creacion: usuario.fecha_creacion,
+            ultimo_acceso: usuario.ultimo_acceso
+        };
+
+        res.json(usuarioFormateado);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener usuario', error: error.message });
     }

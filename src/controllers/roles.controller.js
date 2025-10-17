@@ -4,7 +4,14 @@ const Role = require('../models/role.model');
 exports.getRoles = async (req, res) => {
     try {
         const roles = await Role.findAll();
-        res.json(roles);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const rolesFormateados = roles.map(role => ({
+            id: role.id_rol,
+            nombre: role.nombre_rol,
+            descripcion: role.descripcion_rol,
+            fecha_creacion: role.fecha_creacion
+        }));
+        res.json({ roles: rolesFormateados });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener roles', error: error.message });
     }
@@ -18,7 +25,16 @@ exports.getRoleById = async (req, res) => {
         if (!role) {
             return res.status(404).json({ message: 'Rol no encontrado' });
         }
-        res.json(role);
+
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const roleFormateado = {
+            id: role.id_rol,
+            nombre: role.nombre_rol,
+            descripcion: role.descripcion_rol,
+            fecha_creacion: role.fecha_creacion
+        };
+
+        res.json(roleFormateado);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener rol', error: error.message });
     }

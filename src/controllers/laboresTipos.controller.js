@@ -4,7 +4,12 @@ const LaborTipo = require('../models/laborTipo.model');
 exports.getLaboresTipos = async (req, res) => {
     try {
         const laboresTipos = await LaborTipo.findAll();
-        res.json(laboresTipos);
+        // Mapear los campos de la base de datos a los nombres esperados por el frontend
+        const tiposLaborFormateados = laboresTipos.map(tipo => ({
+            id: tipo.id_labor_tipo,
+            nombre: tipo.nombre_labor
+        }));
+        res.json({ tiposLabor: tiposLaborFormateados });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener tipos de labores', error: error.message });
     }
