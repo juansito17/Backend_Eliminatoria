@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const cors = require('cors'); // Importar el paquete cors
 const usuariosRoutes = require('./routes/usuarios.routes');
 const rolesRoutes = require('./routes/roles.routes');
 const cultivosRoutes = require('./routes/cultivos.routes');
@@ -12,6 +13,10 @@ const authRoutes = require('./routes/auth.routes'); // Importar las rutas de aut
 
 // Middlewares
 app.use(express.json()); // Para parsear JSON en las peticiones
+app.use(cors({ // Configurar CORS para permitir solicitudes desde el frontend
+    origin: 'http://localhost:3000', // Reemplaza con el origen de tu frontend
+    credentials: true
+}));
 
 // Rutas
 app.get('/', (req, res) => {

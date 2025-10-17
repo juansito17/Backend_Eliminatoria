@@ -69,3 +69,20 @@ exports.register = async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor al registrar usuario', error: error.message });
     }
 };
+
+// Middleware para verificar el token
+exports.verifyToken = (req, res) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+        return res.status(401).json({ message: 'No se proporcionó token, autorización denegada' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey');
+        req.user = decoded.user;
+        res.json({ user: req.user, message: 'Token válido' });
+    } catch (error) {
+        res.status(401).json({ message: 'Token no es válido', error: error.message });
+    }
+};
