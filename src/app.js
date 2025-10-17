@@ -6,6 +6,7 @@ const cultivosRoutes = require('./routes/cultivos.routes');
 const trabajadoresRoutes = require('./routes/trabajadores.routes');
 const laboresTiposRoutes = require('./routes/laboresTipos.routes');
 const laboresAgricolasRoutes = require('./routes/laboresAgricolas.routes');
+const alertasRoutes = require('./routes/alertas.routes');
 
 // Middlewares
 app.use(express.json()); // Para parsear JSON en las peticiones
@@ -32,5 +33,8 @@ app.use('/api/labores-tipos', laboresTiposRoutes);
 
 // Rutas de Labores Agrícolas
 app.use('/api/labores-agricolas', laboresAgricolasRoutes);
+
+// Rutas de Alertas
+app.use('/api/alertas', alertasRoutes);
 
 module.exports = app;
