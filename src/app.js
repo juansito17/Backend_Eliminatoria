@@ -9,6 +9,7 @@ const laboresTiposRoutes = require('./routes/laboresTipos.routes');
 const laboresAgricolasRoutes = require('./routes/laboresAgricolas.routes');
 const alertasRoutes = require('./routes/alertas.routes');
 const dashboardProduccionDiariaRoutes = require('./routes/dashboardProduccionDiaria.routes');
+const reportesRoutes = require('./routes/reportes.routes'); // Importar las rutas de reportes
 const authRoutes = require('./routes/auth.routes'); // Importar las rutas de autenticación
 
 // Middlewares
@@ -49,5 +50,8 @@ app.use('/api/alertas', alertasRoutes);
 
 // Rutas de Dashboard Producción Diaria
 app.use('/api/dashboard-produccion-diaria', dashboardProduccionDiariaRoutes);
+
+// Rutas de Reportes
+app.use('/api/reportes', reportesRoutes);
 
 module.exports = app;

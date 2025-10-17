@@ -5,5 +5,6 @@ const auth = require('../middleware/auth.middleware'); // Importar el middleware
 
 // Ruta para obtener los datos agregados del dashboard
 router.get('/', auth, dashboardProduccionDiariaController.getDashboardProduccionDiaria);
+router.get('/historico', auth, dashboardProduccionDiariaController.getHistoricalData);
 
 module.exports = router;

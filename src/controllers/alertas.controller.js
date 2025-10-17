@@ -11,6 +11,46 @@ exports.getAlertas = async (req, res) => {
     }
 };
 
+// Función para verificar y generar alertas automáticamente
+exports.checkAndGenerateAlerts = async () => {
+    try {
+        // Ejemplo: Verificar baja en rendimiento (si el peso_kg promedio del día es menor a un umbral)
+        const [promedioPesoResult] = await pool.query(`
+            SELECT AVG(peso_kg) AS promedio_peso
+            FROM labores_agricolas
+            WHERE DATE(fecha_labor) = CURDATE();
+        `);
+        const promedio_peso_hoy = promedioPesoResult[0].promedio_peso || 0;
+
+        const umbral_bajo_rendimiento = 50; // Ejemplo: umbral en kg
+
+        if (promedio_peso_hoy > 0 && promedio_peso_hoy < umbral_bajo_rendimiento) {
+            const tipo_alerta = 'BAJO_RENDIMIENTO';
+            const descripcion = `El rendimiento promedio de hoy (${promedio_peso_hoy.toFixed(2)} kg) está por debajo del umbral (${umbral_bajo_rendimiento} kg).`;
+            const nivel_severidad = 'Medio';
+
+            // Verificar si ya existe una alerta similar para hoy
+            const [existingAlert] = await pool.query(`
+                SELECT * FROM alertas
+                WHERE tipo_alerta = ? AND DATE(fecha_creacion) = CURDATE() AND resuelta = FALSE;
+            `, [tipo_alerta]);
+
+            if (existingAlert.length === 0) {
+                const id = await Alerta.create(null, null, tipo_alerta, descripcion, nivel_severidad, false);
+                const io = getIo();
+                io.emit('nueva-alerta', { id, tipo_alerta, descripcion, nivel_severidad });
+                console.log('Alerta de bajo rendimiento generada:', descripcion);
+            } else {
+                console.log('Ya existe una alerta de bajo rendimiento activa para hoy.');
+            }
+        }
+        // Se pueden añadir más lógicas para otros tipos de alertas (fallos de pesaje, retrasos, etc.)
+
+    } catch (error) {
+        console.error('Error al verificar y generar alertas:', error);
+    }
+};
+
 // Obtener una alerta por ID
 exports.getAlertaById = async (req, res) => {
     const { id } = req.params;
