@@ -1,4 +1,5 @@
 const DashboardProduccionDiaria = require('../models/dashboardProduccionDiaria.model');
+const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 
 // Obtener todos los registros de producción diaria
 exports.getDashboardProduccionDiaria = async (req, res) => {
@@ -29,6 +30,8 @@ exports.createDashboardProduccionDiaria = async (req, res) => {
     const { fecha, id_lote, id_cultivo, total_peso_kg, productividad_promedio_trabajador, costo_total_aproximado } = req.body;
     try {
         const id = await DashboardProduccionDiaria.create(fecha, id_lote, id_cultivo, total_peso_kg, productividad_promedio_trabajador, costo_total_aproximado);
+        const io = getIo();
+        io.emit('nueva-produccion-diaria', { id, fecha, id_lote, id_cultivo, total_peso_kg }); // Emitir evento WebSocket
         res.status(201).json({ message: 'Registro de producción diaria creado exitosamente', id });
     } catch (error) {
         res.status(500).json({ message: 'Error al crear registro de producción diaria', error: error.message });
@@ -45,6 +48,8 @@ exports.updateDashboardProduccionDiaria = async (req, res) => {
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Registro de producción diaria no encontrado para actualizar' });
         }
+        const io = getIo();
+        io.emit('actualizacion-produccion-diaria', { id, fecha, id_lote, id_cultivo, total_peso_kg }); // Emitir evento WebSocket
         res.json({ message: 'Registro de producción diaria actualizado exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al actualizar registro de producción diaria', error: error.message });
@@ -59,6 +64,8 @@ exports.deleteDashboardProduccionDiaria = async (req, res) => {
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Registro de producción diaria no encontrado para eliminar' });
         }
+        const io = getIo();
+        io.emit('eliminacion-produccion-diaria', { id }); // Emitir evento WebSocket
         res.json({ message: 'Registro de producción diaria eliminado exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al eliminar registro de producción diaria', error: error.message });

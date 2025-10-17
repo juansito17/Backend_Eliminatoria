@@ -1,4 +1,5 @@
 const Alerta = require('../models/alerta.model');
+const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 
 // Obtener todas las alertas
 exports.getAlertas = async (req, res) => {
@@ -29,6 +30,8 @@ exports.createAlerta = async (req, res) => {
     const { id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta } = req.body;
     try {
         const id = await Alerta.create(id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta);
+        const io = getIo();
+        io.emit('nueva-alerta', { id, id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta }); // Emitir evento WebSocket
         res.status(201).json({ message: 'Alerta creada exitosamente', id });
     } catch (error) {
         res.status(500).json({ message: 'Error al crear alerta', error: error.message });
@@ -45,6 +48,8 @@ exports.updateAlerta = async (req, res) => {
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Alerta no encontrada para actualizar' });
         }
+        const io = getIo();
+        io.emit('actualizacion-alerta', { id, id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta }); // Emitir evento WebSocket
         res.json({ message: 'Alerta actualizada exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al actualizar alerta', error: error.message });
@@ -59,6 +64,8 @@ exports.deleteAlerta = async (req, res) => {
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Alerta no encontrada para eliminar' });
         }
+        const io = getIo();
+        io.emit('eliminacion-alerta', { id }); // Emitir evento WebSocket
         res.json({ message: 'Alerta eliminada exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al eliminar alerta', error: error.message });
