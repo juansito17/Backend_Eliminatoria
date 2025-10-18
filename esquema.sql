@@ -5,6 +5,7 @@
 -- #############################################################################
 
 -- --- Creaciรณn de la Base de Datos ---
+DROP DATABASE IF EXISTS agricultura_db;
 CREATE DATABASE IF NOT EXISTS agricultura_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE agricultura_db;
 
@@ -38,6 +39,17 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- -----------------------------------------------------
+-- Tabla: cultivos
+-- Descripciรณn: Catรกlogo de los tipos de cultivo.
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS cultivos (
+  id_cultivo INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_cultivo VARCHAR(100) NOT NULL UNIQUE,
+  descripcion_cultivo TEXT,
+  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- -----------------------------------------------------
 -- Tabla: lotes
 -- Descripciรณn: Define los lotes o parcelas de la finca.
 -- -----------------------------------------------------
@@ -47,19 +59,10 @@ CREATE TABLE IF NOT EXISTS lotes (
   nombre_lote VARCHAR(100) NOT NULL,
   ubicacion_gps_poligono JSON, -- Para almacenar coordenadas del lote
   area_hectareas DECIMAL(10, 2),
+  id_supervisor INT NULL, -- Nueva columna para el supervisor
   fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (id_cultivo) REFERENCES cultivos(id_cultivo)
-);
-
--- -----------------------------------------------------
--- Tabla: cultivos
--- Descripciรณn: Catรกlogo de los tipos de cultivo.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS cultivos (
-  id_cultivo INT AUTO_INCREMENT PRIMARY KEY,
-  nombre_cultivo VARCHAR(100) NOT NULL UNIQUE,
-  descripcion_cultivo TEXT,
-  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  FOREIGN KEY (id_cultivo) REFERENCES cultivos(id_cultivo),
+  FOREIGN KEY (id_supervisor) REFERENCES usuarios(id_usuario) -- Clave foránea para el supervisor
 );
 
 -- -----------------------------------------------------
@@ -151,19 +154,5 @@ CREATE TABLE IF NOT EXISTS dashboard_produccion_diaria (
   FOREIGN KEY (id_lote) REFERENCES lotes(id_lote),
   FOREIGN KEY (id_cultivo) REFERENCES cultivos(id_cultivo)
 );
-
--- --- Inserciรณn de Datos Iniciales (Maestros) ---
-
-INSERT INTO roles (nombre_rol, descripcion_rol) VALUES
-('Administrador', 'Acceso total al sistema y configuraciรณn.'),
-('Supervisor', 'Gestiรณn de labores, trabajadores y reportes.'),
-('Operario', 'Registro de datos de campo y consulta de tareas.');
-
-INSERT INTO labores_tipos (nombre_labor, descripcion_labor) VALUES
-('Cosecha', 'Recolecciรณn del producto del campo.'),
-('Pesaje', 'Registro del peso del producto recolectado.'),
-('Transporte', 'Movimiento del producto desde el lote a la bodega.'),
-('Siembra', 'Plantaciรณn de nuevas semillas o plรกntulas.'),
-('Riego', 'Aplicaciรณn de agua al cultivo.');
 
 -- --- Fin del Script ---
