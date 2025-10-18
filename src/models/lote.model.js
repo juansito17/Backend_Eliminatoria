@@ -8,9 +8,9 @@ exports.findAll = async () => {
       l.nombre_lote,
       l.area_hectareas,
       l.ubicacion_gps_poligono,
-      l.id_cultivo,
+      COALESCE(l.id_cultivo, NULL) AS id_cultivo,
       c.nombre_cultivo AS cultivo_nombre,
-      l.id_supervisor,
+      COALESCE(l.id_supervisor, NULL) AS id_supervisor,
       u.nombre_usuario AS supervisor_nombre,
       l.fecha_creacion
     FROM lotes l
@@ -28,9 +28,9 @@ exports.findById = async (id) => {
       l.nombre_lote,
       l.area_hectareas,
       l.ubicacion_gps_poligono,
-      l.id_cultivo,
+      COALESCE(l.id_cultivo, NULL) AS id_cultivo,
       c.nombre_cultivo AS cultivo_nombre,
-      l.id_supervisor,
+      COALESCE(l.id_supervisor, NULL) AS id_supervisor,
       u.nombre_usuario AS supervisor_nombre,
       l.fecha_creacion
     FROM lotes l
