@@ -346,7 +346,32 @@ exports.getLaboresDetallado = async (req, res) => {
  // Generar reporte de labores agrícolas en PDF
 exports.generateLaboresPdf = async (req, res) => {
     try {
-        // Obtener datos
+        // Obtener filtros de la query
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+        let whereConditions = [];
+        let queryParams = [];
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        // Obtener datos filtrados
         const [labores] = await pool.query(`
             SELECT
                 la.fecha_labor,
@@ -364,8 +389,9 @@ exports.generateLaboresPdf = async (req, res) => {
             JOIN lotes l ON la.id_lote = l.id_lote
             JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
             JOIN usuarios u ON la.id_usuario_registro = u.id_usuario
+            ${whereClause}
             ORDER BY la.fecha_labor DESC;
-        `);
+        `, queryParams);
 
         // Crear documento PDF con márgenes y tamaño A4
         const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
@@ -540,6 +566,32 @@ exports.generateLaboresPdf = async (req, res) => {
 // Generar reporte de labores agrícolas en Excel
 exports.generateLaboresExcel = async (req, res) => {
     try {
+        // Obtener filtros de la query
+        const { fechaInicio, fechaFin, cultivoId, laborId, trabajadorId } = req.query;
+        let whereConditions = [];
+        let queryParams = [];
+        if (fechaInicio) {
+            whereConditions.push('la.fecha_labor >= ?');
+            queryParams.push(fechaInicio);
+        }
+        if (fechaFin) {
+            whereConditions.push('la.fecha_labor <= ?');
+            queryParams.push(fechaFin);
+        }
+        if (cultivoId) {
+            whereConditions.push('la.id_cultivo = ?');
+            queryParams.push(cultivoId);
+        }
+        if (laborId) {
+            whereConditions.push('la.id_labor_tipo = ?');
+            queryParams.push(laborId);
+        }
+        if (trabajadorId) {
+            whereConditions.push('la.id_trabajador = ?');
+            queryParams.push(trabajadorId);
+        }
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        // Obtener datos filtrados
         const [labores] = await pool.query(`
             SELECT
                 la.fecha_labor,
@@ -557,8 +609,9 @@ exports.generateLaboresExcel = async (req, res) => {
             JOIN lotes l ON la.id_lote = l.id_lote
             JOIN trabajadores t ON la.id_trabajador = t.id_trabajador
             JOIN usuarios u ON la.id_usuario_registro = u.id_usuario
+            ${whereClause}
             ORDER BY la.fecha_labor DESC;
-        `);
+        `, queryParams);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Labores Agrícolas');
