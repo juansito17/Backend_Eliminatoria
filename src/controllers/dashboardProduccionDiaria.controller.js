@@ -5,19 +5,28 @@ const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 exports.getDashboardProduccionDiaria = async (req, res) => {
     try {
         // Producción Diaria (ejemplo: suma del peso de las labores de hoy)
+        // Calcular rango de día en la zona local para evitar problemas de zona horaria en la BD
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(startOfDay);
+        endOfDay.setDate(endOfDay.getDate() + 1);
+        const startStr = startOfDay.toISOString().slice(0, 19).replace('T', ' ');
+        const endStr = endOfDay.toISOString().slice(0, 19).replace('T', ' ');
+
         const [produccionDiariaResult] = await pool.query(`
             SELECT SUM(peso_kg) AS total_peso_kg
             FROM labores_agricolas
-            WHERE DATE(fecha_labor) = CURDATE();
-        `);
+            WHERE fecha_labor >= ? AND fecha_labor < ?;
+        `, [startStr, endStr]);
         const total_peso_kg = produccionDiariaResult[0].total_peso_kg || 0;
 
         // Trabajadores Activos (ejemplo: contar trabajadores con labores hoy)
         const [trabajadoresActivosResult] = await pool.query(`
             SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
             FROM labores_agricolas
-            WHERE DATE(fecha_labor) = CURDATE();
-        `);
+            WHERE fecha_labor >= ? AND fecha_labor < ?;
+        `, [startStr, endStr]);
         const trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
 
         // Cultivos Activos (contar todos los cultivos existentes)
@@ -32,17 +41,21 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
             SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
             FROM labores_agricolas la
             JOIN lotes l ON la.id_lote = l.id_lote
-            WHERE DATE(la.fecha_labor) = CURDATE()
+            WHERE la.fecha_labor >= ? AND la.fecha_labor < ?
             GROUP BY l.nombre_lote;
-        `);
-        const rendimiento_por_lote = rendimientoPorLoteResult;
+        `, [startStr, endStr]);
+        // Asegurar que peso_total_lote sea number (el driver devuelve strings para decimales)
+        const rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
+            nombre_lote: item.nombre_lote,
+            peso_total_lote: parseFloat(item.peso_total_lote || 0)
+        }));
 
         // Costo Total Aproximado (ejemplo: suma del costo aproximado de las labores de hoy)
         const [costoTotalAproximadoResult] = await pool.query(`
             SELECT SUM(costo_aproximado) AS costo_total_aproximado
             FROM labores_agricolas
-            WHERE DATE(fecha_labor) = CURDATE();
-        `);
+            WHERE fecha_labor >= ? AND fecha_labor < ?;
+        `, [startStr, endStr]);
         const costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
 
         // Definir un rendimiento óptimo por trabajador (ejemplo: 100 kg por trabajador)
