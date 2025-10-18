@@ -43,10 +43,12 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS lotes (
   id_lote INT AUTO_INCREMENT PRIMARY KEY,
+  id_cultivo INT NULL,
   nombre_lote VARCHAR(100) NOT NULL,
   ubicacion_gps_poligono JSON, -- Para almacenar coordenadas del lote
   area_hectareas DECIMAL(10, 2),
-  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_cultivo) REFERENCES cultivos(id_cultivo)
 );
 
 -- -----------------------------------------------------

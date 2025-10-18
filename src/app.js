@@ -4,6 +4,7 @@ const cors = require('cors'); // Importar el paquete cors
 const usuariosRoutes = require('./routes/usuarios.routes');
 const rolesRoutes = require('./routes/roles.routes');
 const cultivosRoutes = require('./routes/cultivos.routes');
+const lotesRoutes = require('./routes/lotes.routes');
 const trabajadoresRoutes = require('./routes/trabajadores.routes');
 const laboresTiposRoutes = require('./routes/laboresTipos.routes');
 const laboresAgricolasRoutes = require('./routes/laboresAgricolas.routes');
@@ -35,6 +36,9 @@ app.use('/api/roles', rolesRoutes);
 
 // Rutas de Cultivos
 app.use('/api/cultivos', cultivosRoutes);
+
+// Rutas de Lotes
+app.use('/api/lotes', lotesRoutes);
 
 // Rutas de Trabajadores
 app.use('/api/trabajadores', trabajadoresRoutes);
