@@ -1,5 +1,27 @@
 const pool = require('../config/database');
 
+// Helper: construir WKT POINT correcto (lon lat) a partir de distintos formatos de entrada
+const buildPointWKT = (ubic) => {
+    if (!ubic) return null;
+    let lat, lon;
+
+    // Aceptar string "lat,lon"
+    if (typeof ubic === 'string') {
+        const parts = ubic.split(',').map(p => p.trim());
+        lat = parseFloat(parts[0]);
+        lon = parseFloat(parts[1]);
+    } else if (typeof ubic === 'object') {
+        // Aceptar { latitude, longitude } o { lat, lon }
+        lat = parseFloat(ubic.latitude ?? ubic.lat);
+        lon = parseFloat(ubic.longitude ?? ubic.lon);
+    }
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+    // WKT POINT requiere "POINT(lon lat)"
+    return `POINT(${lon} ${lat})`;
+};
+
 // Obtener todas las labores agrícolas con filtros y paginación
 exports.findAll = async (search = '', cultivoId = null, tipoLaborId = null, userId = null, page = 1, limit = 10) => {
     let query = `
@@ -72,33 +94,79 @@ exports.findById = async (id) => {
     return rows[0];
 };
 
-// Crear una nueva labor agrícola
+ // Crear una nueva labor agrícola
 exports.create = async (id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones) => {
-    const [result] = await pool.query(
-        `INSERT INTO labores_agricolas (id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?))`,
-        [id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto ? `POINT(${ubicacion_gps_punto.latitude} ${ubicacion_gps_punto.longitude})` : null, observaciones]
-    );
+    // Construir WKT de forma segura
+    const pointWkt = buildPointWKT(ubicacion_gps_punto);
+
+    // Construir consulta y parámetros condicionalmente para evitar ST_GeomFromText(NULL)
+    const query = `
+        INSERT INTO labores_agricolas
+            (id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${pointWkt ? 'ST_GeomFromText(?)' : 'NULL'}, ?)
+    `;
+
+    const params = [
+        id_lote,
+        id_cultivo,
+        id_trabajador,
+        id_labor_tipo,
+        id_usuario_registro,
+        fecha_labor,
+        cantidad_recolectada,
+        peso_kg,
+        costo_aproximado
+    ];
+
+    if (pointWkt) params.push(pointWkt);
+    params.push(observaciones);
+
+    const [result] = await pool.query(query, params);
     return result.insertId;
 };
 
-// Actualizar una labor agrícola existente
+ // Actualizar una labor agrícola existente
 exports.update = async (id, id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones) => {
-    const [result] = await pool.query(
-        `UPDATE labores_agricolas SET
-            id_lote = COALESCE(?, id_lote),
-            id_cultivo = COALESCE(?, id_cultivo),
-            id_trabajador = COALESCE(?, id_trabajador),
-            id_labor_tipo = COALESCE(?, id_labor_tipo),
-            id_usuario_registro = COALESCE(?, id_usuario_registro),
-            fecha_labor = COALESCE(?, fecha_labor),
-            cantidad_recolectada = COALESCE(?, cantidad_recolectada),
-            peso_kg = COALESCE(?, peso_kg),
-            costo_aproximado = COALESCE(?, costo_aproximado),
-            ubicacion_gps_punto = COALESCE(ST_GeomFromText(?), ubicacion_gps_punto),
-            observaciones = COALESCE(?, observaciones)
-        WHERE id_labor = ?`,
-        [id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto ? `POINT(${ubicacion_gps_punto.latitude} ${ubicacion_gps_punto.longitude})` : null, observaciones, id]
-    );
+    // Construir WKT para posible actualización de ubicación
+    const pointWkt = buildPointWKT(ubicacion_gps_punto);
+
+    // Construir dinámicamente las cláusulas SET y parámetros para evitar ST_GeomFromText(NULL)
+    const setClauses = [
+        'id_lote = COALESCE(?, id_lote)',
+        'id_cultivo = COALESCE(?, id_cultivo)',
+        'id_trabajador = COALESCE(?, id_trabajador)',
+        'id_labor_tipo = COALESCE(?, id_labor_tipo)',
+        'id_usuario_registro = COALESCE(?, id_usuario_registro)',
+        'fecha_labor = COALESCE(?, fecha_labor)',
+        'cantidad_recolectada = COALESCE(?, cantidad_recolectada)',
+        'peso_kg = COALESCE(?, peso_kg)',
+        'costo_aproximado = COALESCE(?, costo_aproximado)'
+    ];
+
+    const params = [
+        id_lote,
+        id_cultivo,
+        id_trabajador,
+        id_labor_tipo,
+        id_usuario_registro,
+        fecha_labor,
+        cantidad_recolectada,
+        peso_kg,
+        costo_aproximado
+    ];
+
+    if (pointWkt) {
+        setClauses.push('ubicacion_gps_punto = ST_GeomFromText(?)');
+        params.push(pointWkt);
+    }
+
+    setClauses.push('observaciones = COALESCE(?, observaciones)');
+    params.push(observaciones);
+
+    const query = `UPDATE labores_agricolas SET ${setClauses.join(', ')} WHERE id_labor = ?`;
+    params.push(id);
+
+    const [result] = await pool.query(query, params);
     return result.affectedRows;
 };
 

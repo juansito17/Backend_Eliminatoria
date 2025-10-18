@@ -62,11 +62,27 @@ exports.getLaborAgricolaById = async (req, res) => {
     }
 };
 
-// Crear una nueva labor agrícola
+ // Crear una nueva labor agrícola
 exports.createLaborAgricola = async (req, res) => {
-    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
+    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
     try {
-        const id = await LaborAgricola.create(id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones);
+        // Forzar el usuario que registra a partir del token (evitar suplantación)
+        const idUsuarioRegistro = req.user && req.user.id ? req.user.id : null;
+
+        const id = await LaborAgricola.create(
+            id_lote,
+            id_cultivo,
+            id_trabajador,
+            id_labor_tipo,
+            idUsuarioRegistro,
+            fecha_labor,
+            cantidad_recolectada,
+            peso_kg,
+            costo_aproximado,
+            ubicacion_gps_punto,
+            observaciones
+        );
+
         const io = getIo();
         io.emit('nueva-labor-agricola', { id, id_lote, id_cultivo, id_trabajador, fecha_labor, cantidad_recolectada, peso_kg }); // Emitir evento WebSocket
         res.status(201).json({ message: 'Labor agrícola creada exitosamente', id });
@@ -75,13 +91,30 @@ exports.createLaborAgricola = async (req, res) => {
     }
 };
 
-// Actualizar una labor agrícola existente
+ // Actualizar una labor agrícola existente
 exports.updateLaborAgricola = async (req, res) => {
     const { id } = req.params;
-    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
+    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
 
     try {
-        const affectedRows = await LaborAgricola.update(id, id_lote, id_cultivo, id_trabajador, id_labor_tipo, id_usuario_registro, fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones);
+        // Forzar que el usuario de registro sea el usuario autenticado (evitar suplantación).
+        // Si el sistema permite que un administrador cambie el usuario registro, puede ajustarse aquí.
+        const idUsuarioRegistro = req.user && req.user.id ? req.user.id : null;
+
+        const affectedRows = await LaborAgricola.update(
+            id,
+            id_lote,
+            id_cultivo,
+            id_trabajador,
+            id_labor_tipo,
+            idUsuarioRegistro,
+            fecha_labor,
+            cantidad_recolectada,
+            peso_kg,
+            costo_aproximado,
+            ubicacion_gps_punto,
+            observaciones
+        );
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Labor agrícola no encontrada para actualizar' });
         }
