@@ -23,11 +23,28 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
         const startStr = formatSQLDate(startUTC);
         const endStr = formatSQLDate(endUTC);
 
+        // Build role-based filters
+        // Admin (rol === 1) => sin filtro
+        // Supervisor (rol === 2) => limitar a registros creados por el supervisor (id_usuario_registro = userId)
+        // Operario  (rol === 3) => limitar a registros creados por el operario (id_usuario_registro = userId)
+        // Nota: Actualmente no existe una relación supervisor->lotes en el esquema; si se agrega,
+        // la lógica aquí debe actualizarse para filtrar por lotes asignados al supervisor.
+        let whereClause = '';
+        let whereClauseAlias = '';
+        let whereParams = [];
+        const userRole = req.user?.rol;
+        const userId = req.user?.id;
+        if (userRole === 2 || userRole === 3) {
+            whereClause = ' AND id_usuario_registro = ?';
+            whereClauseAlias = ' AND la.id_usuario_registro = ?';
+            whereParams = [userId];
+        }
+
         const [produccionDiariaResult] = await pool.query(`
             SELECT SUM(peso_kg) AS total_peso_kg
             FROM labores_agricolas
-            WHERE fecha_labor >= ? AND fecha_labor < ?;
-        `, [startStr, endStr]);
+            WHERE fecha_labor >= ? AND fecha_labor < ? ${whereClause};
+        `, whereParams.length ? [startStr, endStr, ...whereParams] : [startStr, endStr]);
         let total_peso_kg = produccionDiariaResult[0].total_peso_kg || 0;
 
         // Si no hay datos en el rango calculado, usar la última fecha con registros
@@ -44,8 +61,8 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
                 const [lastTotal] = await pool.query(`
                     SELECT SUM(peso_kg) AS total_peso_kg
                     FROM labores_agricolas
-                    WHERE DATE(fecha_labor) = ?;
-                `, [fallbackDate]);
+                    WHERE DATE(fecha_labor) = ? ${whereClause};
+                `, whereParams.length ? [fallbackDate, ...whereParams] : [fallbackDate]);
                 total_peso_kg = lastTotal[0].total_peso_kg || 0;
             }
         }
@@ -56,15 +73,15 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
             const [trabajadoresActivosResult] = await pool.query(`
                 SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
                 FROM labores_agricolas
-                WHERE DATE(fecha_labor) = ?;
-            `, [fallbackDate]);
+                WHERE DATE(fecha_labor) = ? ${whereClause};
+            `, whereParams.length ? [fallbackDate, ...whereParams] : [fallbackDate]);
             trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
         } else {
             const [trabajadoresActivosResult] = await pool.query(`
                 SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
                 FROM labores_agricolas
-                WHERE fecha_labor >= ? AND fecha_labor < ?;
-            `, [startStr, endStr]);
+                WHERE fecha_labor >= ? AND fecha_labor < ? ${whereClause};
+            `, whereParams.length ? [startStr, endStr, ...whereParams] : [startStr, endStr]);
             trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
         }
 
@@ -82,9 +99,9 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
                 SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
                 FROM labores_agricolas la
                 JOIN lotes l ON la.id_lote = l.id_lote
-                WHERE DATE(la.fecha_labor) = ?
+                WHERE DATE(la.fecha_labor) = ? ${whereClauseAlias}
                 GROUP BY l.nombre_lote;
-            `, [fallbackDate]);
+            `, whereParams.length ? [fallbackDate, ...whereParams] : [fallbackDate]);
             rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
                 nombre_lote: item.nombre_lote,
                 peso_total_lote: parseFloat(item.peso_total_lote || 0)
@@ -94,9 +111,9 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
                 SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
                 FROM labores_agricolas la
                 JOIN lotes l ON la.id_lote = l.id_lote
-                WHERE la.fecha_labor >= ? AND la.fecha_labor < ?
+                WHERE la.fecha_labor >= ? AND la.fecha_labor < ? ${whereClauseAlias}
                 GROUP BY l.nombre_lote;
-            `, [startStr, endStr]);
+            `, whereParams.length ? [startStr, endStr, ...whereParams] : [startStr, endStr]);
             rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
                 nombre_lote: item.nombre_lote,
                 peso_total_lote: parseFloat(item.peso_total_lote || 0)
@@ -109,15 +126,15 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
             const [costoTotalAproximadoResult] = await pool.query(`
                 SELECT SUM(costo_aproximado) AS costo_total_aproximado
                 FROM labores_agricolas
-                WHERE DATE(fecha_labor) = ?;
-            `, [fallbackDate]);
+                WHERE DATE(fecha_labor) = ? ${whereClause};
+            `, whereParams.length ? [fallbackDate, ...whereParams] : [fallbackDate]);
             costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
         } else {
             const [costoTotalAproximadoResult] = await pool.query(`
                 SELECT SUM(costo_aproximado) AS costo_total_aproximado
                 FROM labores_agricolas
-                WHERE fecha_labor >= ? AND fecha_labor < ?;
-            `, [startStr, endStr]);
+                WHERE fecha_labor >= ? AND fecha_labor < ? ${whereClause};
+            `, whereParams.length ? [startStr, endStr, ...whereParams] : [startStr, endStr]);
             costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
         }
 

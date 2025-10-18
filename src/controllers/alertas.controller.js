@@ -2,6 +2,85 @@ const Alerta = require('../models/alerta.model');
 const pool = require('../config/database'); // Importar la conexión a la base de datos
 const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 
+ // Integración con Gemini (Google GenAI) — carga perezosa y fallback si no está instalado o no hay API key
+let ai = null;
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
+function ensureGeminiClient() {
+    if (ai) return ai;
+    if (!process.env.GEMINI_API_KEY) return null;
+    try {
+        const { GoogleGenAI } = require('@google/genai');
+        ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+        });
+        return ai;
+    } catch (err) {
+        console.warn('Módulo @google/genai no disponible, se usará fallback:', err?.message || err);
+        return null;
+    }
+}
+
+/**
+ * Genera una descripción refinada para una alerta usando la API de Gemini.
+ * Si no hay API key o ocurre un error, devuelve el texto base (contexto) como fallback.
+ *
+ * @param {string} tipo_alerta
+ * @param {string} contexto Texto base para el que se solicita una mejora/versión resumida
+ * @returns {Promise<string>}
+ */
+async function generarDescripcionConGemini(tipo_alerta, contexto) {
+    try {
+        // Si no hay API key, usamos el texto base como fallback
+        if (!process.env.GEMINI_API_KEY) {
+            return contexto;
+        }
+
+        const client = ensureGeminiClient();
+        if (!client) {
+            // Cliente no disponible (módulo no instalado o error al inicializar) => fallback
+            return contexto;
+        }
+
+        const prompt = `Eres un asistente que genera descripciones concisas y profesionales para alertas agrícolas.\nTipo de alerta: ${tipo_alerta}\nContexto: ${contexto}\nProporciona una sola frase breve que explique la alerta y una recomendación opcional (máximo 2 frases).`;
+
+        const contents = [
+            {
+                role: 'user',
+                parts: [
+                    { text: prompt }
+                ],
+            },
+        ];
+
+        const response = await client.models.generateContent({
+            model: GEMINI_MODEL,
+            config: {
+                thinkingConfig: {
+                    thinkingBudget: 0,
+                },
+            },
+            contents,
+        });
+
+        // Extraer texto de la respuesta con varios patrones de seguridad
+        const text =
+            (response && response.candidates && response.candidates[0] &&
+                response.candidates[0].content && response.candidates[0].content[0] &&
+                response.candidates[0].content[0].text) ||
+            response?.text ||
+            null;
+
+        if (text && typeof text === 'string') {
+            return text.trim();
+        }
+
+        return contexto;
+    } catch (err) {
+        console.error('Error generando descripcion con Gemini:', err?.message || err);
+        return contexto;
+    }
+}
+
 // Obtener todas las alertas
 exports.getAlertas = async (req, res) => {
     try {
@@ -38,7 +117,8 @@ exports.checkAndGenerateAlerts = async () => {
 
         if (promedio_peso_hoy > 0 && promedio_peso_hoy < umbral_bajo_rendimiento) {
             const tipo_alerta = 'BAJO_RENDIMIENTO';
-            const descripcion = `El rendimiento promedio de hoy (${promedio_peso_hoy.toFixed(2)} kg) está por debajo del umbral (${umbral_bajo_rendimiento} kg).`;
+            const descripcionBase = `El rendimiento promedio de hoy (${promedio_peso_hoy.toFixed(2)} kg) está por debajo del umbral (${umbral_bajo_rendimiento} kg).`;
+            const descripcion = await generarDescripcionConGemini(tipo_alerta, descripcionBase);
             const nivel_severidad = 'Medio';
 
             // Verificar si ya existe una alerta similar para hoy
@@ -77,7 +157,8 @@ exports.checkAndGenerateAlerts = async () => {
 
         if (fallos_pesaje_hoy > 0) {
             const tipo_alerta = 'FALLO_PESAJE';
-            const descripcion = `Se detectaron ${fallos_pesaje_hoy} registro(s) con fallos de pesaje hoy.`;
+            const descripcionBase = `Se detectaron ${fallos_pesaje_hoy} registro(s) con fallos de pesaje hoy.`;
+            const descripcion = await generarDescripcionConGemini(tipo_alerta, descripcionBase);
             const nivel_severidad = 'Alto';
 
             // Verificar si ya existe una alerta similar para hoy
@@ -114,7 +195,8 @@ exports.checkAndGenerateAlerts = async () => {
 
         if (retrasos_hoy > 0) {
             const tipo_alerta = 'RETRASO_COSECHA';
-            const descripcion = `Se detectaron ${retrasos_hoy} labor(es) con retraso en la fecha programada.`;
+            const descripcionBase = `Se detectaron ${retrasos_hoy} labor(es) con retraso en la fecha programada.`;
+            const descripcion = await generarDescripcionConGemini(tipo_alerta, descripcionBase);
             const nivel_severidad = 'Medio';
 
             // Verificar si ya existe una alerta similar para hoy
