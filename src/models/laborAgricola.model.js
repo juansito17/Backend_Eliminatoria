@@ -23,7 +23,7 @@ const buildPointWKT = (ubic) => {
 };
 
 // Obtener todas las labores agrícolas con filtros y paginación
-exports.findAll = async (search = '', cultivoId = null, tipoLaborId = null, userId = null, page = 1, limit = 10) => {
+exports.findAll = async (search = '', cultivoId = null, tipoLaborId = null, usuarioRegistroId = null, trabajadorFilter = null, page = 1, limit = 10) => {
     let query = `
         SELECT
             la.*,
@@ -66,10 +66,25 @@ exports.findAll = async (search = '', cultivoId = null, tipoLaborId = null, user
         params.push(tipoLaborId);
         countParams.push(tipoLaborId);
     }
-    if (userId) { // Para el rol 3 (Operario)
+    // Filtrado por id_trabajador (puede ser número o array) o por id_usuario_registro
+    if (trabajadorFilter !== null) {
+        if (Array.isArray(trabajadorFilter)) {
+            if (trabajadorFilter.length === 0) {
+                // Forzar resultado vacío
+                whereClauses.push('1 = 0');
+            } else {
+                whereClauses.push(`la.id_trabajador IN (${trabajadorFilter.map(() => '?').join(',')})`);
+                trabajadorFilter.forEach(v => { params.push(v); countParams.push(v); });
+            }
+        } else {
+            whereClauses.push('la.id_trabajador = ?');
+            params.push(trabajadorFilter);
+            countParams.push(trabajadorFilter);
+        }
+    } else if (usuarioRegistroId) {
         whereClauses.push('la.id_usuario_registro = ?');
-        params.push(userId);
-        countParams.push(userId);
+        params.push(usuarioRegistroId);
+        countParams.push(usuarioRegistroId);
     }
 
     if (whereClauses.length > 0) {

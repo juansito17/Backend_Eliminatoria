@@ -1,22 +1,48 @@
+const pool = require('../config/database');
 const LaborAgricola = require('../models/laborAgricola.model');
 const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 
-// Obtener todas las labores agrícolas
+/** Obtener todas las labores agrícolas con filtrado por rol:
+ *  - Operario (rol 3): solo labores del trabajador vinculado al usuario
+ *  - Supervisor (rol 2): labores de los trabajadores asignados al supervisor
+ *  - Admin (rol 1): todas (sin filtros)
+ */
 exports.getLaboresAgricolas = async (req, res) => {
     try {
         const { page = 1, limit = 10, search = '', cultivoId = null, tipoLaborId = null } = req.query;
-        let userId = null;
 
-        // Si el usuario es un Operario (rol 3), solo puede ver sus propias labores
-        if (req.user.rol === 3) {
-            userId = req.user.id;
+        // Determinar filtros según rol
+        const rol = Number(req.user.rol);
+        const userId = req.user.id_usuario || req.user.id; // compatibilidad payload
+
+        let trabajadorFilter = null; // puede ser null, número o array
+        let usuarioRegistroId = null;
+
+        if (rol === 3) { // Operario: obtener id_trabajador vinculado
+            const [rows] = await pool.query('SELECT id_trabajador FROM trabajadores WHERE id_usuario = ? AND activo = 1 LIMIT 1', [userId]);
+            if (rows.length === 0) {
+                // No vinculado: devolver lista vacía para mayor seguridad
+                return res.json({ labores: [], totalPages: 0, currentPage: Number(page) });
+            }
+            trabajadorFilter = rows[0].id_trabajador;
+        } else if (rol === 2) { // Supervisor: obtener trabajadores a su cargo
+            const [rows] = await pool.query('SELECT id_trabajador FROM supervisor_trabajador WHERE id_supervisor = ? AND activo = 1', [userId]);
+            const trabajadoresIds = rows.map(r => r.id_trabajador);
+            // Si no tiene trabajadores asignados, devolver vacío
+            if (trabajadoresIds.length === 0) {
+                return res.json({ labores: [], totalPages: 0, currentPage: Number(page) });
+            }
+            trabajadorFilter = trabajadoresIds;
+        } else {
+            // Admin: sin filtros
         }
 
         const { labores, totalPages, currentPage } = await LaborAgricola.findAll(
             search,
             cultivoId || null,
             tipoLaborId || null,
-            userId,
+            null, // usuarioRegistroId (no usamos para estos filtros)
+            trabajadorFilter,
             parseInt(page),
             parseInt(limit)
         );
@@ -25,7 +51,7 @@ exports.getLaboresAgricolas = async (req, res) => {
         const laboresFormateadas = labores.map(labor => ({
             id: labor.id_labor,
             fecha: labor.fecha_labor,
-            cultivo: labor.nombre_cultivo || 'Sin cultivo', // Usar nombre si está disponible
+            cultivo: labor.nombre_cultivo || 'Sin cultivo',
             lote: labor.nombre_lote || 'Sin lote',
             trabajador: labor.nombre_completo || 'Sin trabajador',
             tipoLabor: labor.nombre_labor || 'Sin tipo',
@@ -67,7 +93,10 @@ exports.createLaborAgricola = async (req, res) => {
     const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
     try {
         // Forzar el usuario que registra a partir del token (evitar suplantación)
-        const idUsuarioRegistro = req.user && req.user.id ? req.user.id : null;
+        const idUsuarioRegistro = req.user && (req.user.id_usuario || req.user.id) ? (req.user.id_usuario || req.user.id) : null;
+
+        // Definir ventana de edición para el operario (por ejemplo: 2 horas desde la creación)
+        const horaLimiteEdicion = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
 
         const id = await LaborAgricola.create(
             id_lote,
@@ -79,6 +108,7 @@ exports.createLaborAgricola = async (req, res) => {
             cantidad_recolectada,
             peso_kg,
             costo_aproximado,
+            horaLimiteEdicion,
             ubicacion_gps_punto,
             observaciones
         );

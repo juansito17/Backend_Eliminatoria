@@ -2,16 +2,16 @@ const express = require('express');
 const router = express.Router();
 const laboresAgricolasController = require('../controllers/laboresAgricolas.controller');
 const auth = require('../middleware/auth.middleware'); // Importar el middleware de autenticación
-const checkRole = require('../middleware/checkRole'); // Importar el middleware de autorización por roles
+const checkPermission = require('../middleware/checkPermission'); // Importar el middleware de autorización por permisos (acciones)
 const { body } = require('express-validator'); // Validaciones
 
  // Rutas para el CRUD de labores agrícolas
 router.get('/', auth, laboresAgricolasController.getLaboresAgricolas);
-router.get('/:id', auth, laboresAgricolasController.getLaborAgricolaById);
+router.get('/:id', auth, checkPermission('getLabor'), laboresAgricolasController.getLaborAgricolaById);
 router.post(
     '/',
     auth,
-    checkRole([1, 2, 3]),
+    checkPermission('createLabor'),
     [
         body('id_lote').isInt().withMessage('id_lote debe ser entero'),
         body('id_cultivo').isInt().withMessage('id_cultivo debe ser entero'),
@@ -23,11 +23,11 @@ router.post(
         body('ubicacion_gps_punto').optional().matches(/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/).withMessage('ubicacion_gps_punto debe ser "lat,lon"')
     ],
     laboresAgricolasController.createLaborAgricola
-); // Admin, Supervisor, Operario pueden crear
+); // Creación validada por permisos (Operario = solo para sí; Supervisor = para su equipo; Admin = todo)
 router.put(
     '/:id',
     auth,
-    checkRole([1, 2, 3]),
+    checkPermission('updateLabor'),
     [
         body('id_lote').optional().isInt().withMessage('id_lote debe ser entero'),
         body('id_cultivo').optional().isInt().withMessage('id_cultivo debe ser entero'),
@@ -39,8 +39,8 @@ router.put(
         body('ubicacion_gps_punto').optional().matches(/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/).withMessage('ubicacion_gps_punto debe ser "lat,lon"')
     ],
     laboresAgricolasController.updateLaborAgricola
-); // Admin, Supervisor, Operario pueden actualizar
-router.delete('/:id', auth, checkRole([1]), laboresAgricolasController.deleteLaborAgricola); // Solo Admin puede eliminar
+); // Actualización validada por permisos (Operario = ventana limitada; Supervisor = corrección de su equipo; Admin = todo)
+router.delete('/:id', auth, checkPermission('deleteLabor'), laboresAgricolasController.deleteLaborAgricola); // Solo Admin puede eliminar (checkPermission deniega a no-admin)
 
 
 module.exports = router;
