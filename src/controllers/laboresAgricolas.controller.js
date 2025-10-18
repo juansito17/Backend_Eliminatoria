@@ -14,8 +14,8 @@ exports.getLaboresAgricolas = async (req, res) => {
 
         const { labores, totalPages, currentPage } = await LaborAgricola.findAll(
             search,
-            cultivoId,
-            tipoLaborId,
+            cultivoId || null,
+            tipoLaborId || null,
             userId,
             parseInt(page),
             parseInt(limit)
