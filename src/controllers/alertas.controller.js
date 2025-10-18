@@ -6,7 +6,18 @@ const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 exports.getAlertas = async (req, res) => {
     try {
         const alertas = await Alerta.findAll();
-        res.json(alertas);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const alertasFormateadas = alertas.map(alerta => ({
+            id: alerta.id_alerta,
+            id_labor: alerta.id_labor,
+            id_lote: alerta.id_lote,
+            tipo_alerta: alerta.tipo_alerta,
+            descripcion: alerta.descripcion,
+            nivel_severidad: alerta.nivel_severidad,
+            resuelta: alerta.resuelta,
+            fecha_creacion: alerta.fecha_creacion
+        }));
+        res.json({ alertas: alertasFormateadas });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener alertas', error: error.message });
     }
@@ -39,13 +50,95 @@ exports.checkAndGenerateAlerts = async () => {
             if (existingAlert.length === 0) {
                 const id = await Alerta.create(null, null, tipo_alerta, descripcion, nivel_severidad, false);
                 const io = getIo();
-                io.emit('nueva-alerta', { id, tipo_alerta, descripcion, nivel_severidad });
+                io.emit('nueva-alerta', {
+                    id,
+                    id_labor: null,
+                    id_lote: null,
+                    tipo_alerta,
+                    descripcion,
+                    nivel_severidad,
+                    resuelta: false,
+                    fecha_creacion: new Date().toISOString()
+                });
                 console.log('Alerta de bajo rendimiento generada:', descripcion);
             } else {
                 console.log('Ya existe una alerta de bajo rendimiento activa para hoy.');
             }
         }
-        // Se pueden añadir más lógicas para otros tipos de alertas (fallos de pesaje, retrasos, etc.)
+
+        // Nueva lógica: Verificar fallos de pesaje (si hay registros con peso_kg = 0 o NULL)
+        const [fallosPesajeResult] = await pool.query(`
+            SELECT COUNT(*) AS count_fallos
+            FROM labores_agricolas
+            WHERE DATE(fecha_labor) = CURDATE()
+            AND (peso_kg = 0 OR peso_kg IS NULL);
+        `);
+        const fallos_pesaje_hoy = fallosPesajeResult[0].count_fallos || 0;
+
+        if (fallos_pesaje_hoy > 0) {
+            const tipo_alerta = 'FALLO_PESAJE';
+            const descripcion = `Se detectaron ${fallos_pesaje_hoy} registro(s) con fallos de pesaje hoy.`;
+            const nivel_severidad = 'Alto';
+
+            // Verificar si ya existe una alerta similar para hoy
+            const [existingAlert] = await pool.query(`
+                SELECT * FROM alertas
+                WHERE tipo_alerta = ? AND DATE(fecha_creacion) = CURDATE() AND resuelta = FALSE;
+            `, [tipo_alerta]);
+
+            if (existingAlert.length === 0) {
+                const id = await Alerta.create(null, null, tipo_alerta, descripcion, nivel_severidad, false);
+                const io = getIo();
+                io.emit('nueva-alerta', {
+                    id,
+                    id_labor: null,
+                    id_lote: null,
+                    tipo_alerta,
+                    descripcion,
+                    nivel_severidad,
+                    resuelta: false,
+                    fecha_creacion: new Date().toISOString()
+                });
+                console.log('Alerta de fallo de pesaje generada:', descripcion);
+            }
+        }
+
+        // Nueva lógica: Verificar retrasos en cosecha (si hay tareas programadas pero no completadas)
+        const [retrasosResult] = await pool.query(`
+            SELECT COUNT(*) AS count_retrasos
+            FROM labores_agricolas
+            WHERE DATE(fecha_labor) < CURDATE()
+            AND fecha_labor IS NOT NULL;
+        `);
+        const retrasos_hoy = retrasosResult[0].count_retrasos || 0;
+
+        if (retrasos_hoy > 0) {
+            const tipo_alerta = 'RETRASO_COSECHA';
+            const descripcion = `Se detectaron ${retrasos_hoy} labor(es) con retraso en la fecha programada.`;
+            const nivel_severidad = 'Medio';
+
+            // Verificar si ya existe una alerta similar para hoy
+            const [existingAlert] = await pool.query(`
+                SELECT * FROM alertas
+                WHERE tipo_alerta = ? AND DATE(fecha_creacion) = CURDATE() AND resuelta = FALSE;
+            `, [tipo_alerta]);
+
+            if (existingAlert.length === 0) {
+                const id = await Alerta.create(null, null, tipo_alerta, descripcion, nivel_severidad, false);
+                const io = getIo();
+                io.emit('nueva-alerta', {
+                    id,
+                    id_labor: null,
+                    id_lote: null,
+                    tipo_alerta,
+                    descripcion,
+                    nivel_severidad,
+                    resuelta: false,
+                    fecha_creacion: new Date().toISOString()
+                });
+                console.log('Alerta de retraso en cosecha generada:', descripcion);
+            }
+        }
 
     } catch (error) {
         console.error('Error al verificar y generar alertas:', error);
@@ -60,7 +153,20 @@ exports.getAlertaById = async (req, res) => {
         if (!alerta) {
             return res.status(404).json({ message: 'Alerta no encontrada' });
         }
-        res.json(alerta);
+
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const alertaFormateada = {
+            id: alerta.id_alerta,
+            id_labor: alerta.id_labor,
+            id_lote: alerta.id_lote,
+            tipo_alerta: alerta.tipo_alerta,
+            descripcion: alerta.descripcion,
+            nivel_severidad: alerta.nivel_severidad,
+            resuelta: alerta.resuelta,
+            fecha_creacion: alerta.fecha_creacion
+        };
+
+        res.json(alertaFormateada);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener alerta', error: error.message });
     }

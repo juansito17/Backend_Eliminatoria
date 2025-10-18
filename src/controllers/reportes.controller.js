@@ -47,7 +47,16 @@ exports.getProduccionDiaria = async (req, res) => {
             ORDER BY fecha DESC
         `, queryParams);
 
-        res.json(rows);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const produccionFormateada = rows.map(row => ({
+            fecha: row.fecha,
+            cantidad_total: parseFloat(row.cantidad_total || 0),
+            peso_total: parseFloat(row.peso_total || 0),
+            numero_labores: parseInt(row.numero_labores || 0),
+            nombre_cultivo: row.nombre_cultivo
+        }));
+
+        res.json(produccionFormateada);
     } catch (error) {
         console.error('Error al obtener producción diaria:', error);
         res.status(500).json({ message: 'Error al obtener producción diaria', error: error.message });
@@ -101,7 +110,17 @@ exports.getRendimientoLote = async (req, res) => {
             ORDER BY peso_total DESC
         `, queryParams);
 
-        res.json(rows);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const rendimientoFormateado = rows.map(row => ({
+            nombre_lote: row.nombre_lote,
+            nombre_cultivo: row.nombre_cultivo,
+            cantidad_total: parseFloat(row.cantidad_total || 0),
+            peso_total: parseFloat(row.peso_total || 0),
+            promedio_cantidad: parseFloat(row.promedio_cantidad || 0),
+            numero_labores: parseInt(row.numero_labores || 0)
+        }));
+
+        res.json(rendimientoFormateado);
     } catch (error) {
         console.error('Error al obtener rendimiento por lote:', error);
         res.status(500).json({ message: 'Error al obtener rendimiento por lote', error: error.message });
@@ -154,7 +173,17 @@ exports.getEficienciaTrabajador = async (req, res) => {
             ORDER BY peso_total DESC
         `, queryParams);
 
-        res.json(rows);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const eficienciaFormateada = rows.map(row => ({
+            trabajador: row.trabajador,
+            numero_labores: parseInt(row.numero_labores || 0),
+            cantidad_total: parseFloat(row.cantidad_total || 0),
+            peso_total: parseFloat(row.peso_total || 0),
+            promedio_cantidad: parseFloat(row.promedio_cantidad || 0),
+            costo_total: parseFloat(row.costo_total || 0)
+        }));
+
+        res.json(eficienciaFormateada);
     } catch (error) {
         console.error('Error al obtener eficiencia por trabajador:', error);
         res.status(500).json({ message: 'Error al obtener eficiencia por trabajador', error: error.message });
@@ -206,7 +235,16 @@ exports.getHistoricoLabores = async (req, res) => {
             ORDER BY fecha ASC
         `, queryParams);
 
-        res.json(rows);
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const historicoFormateado = rows.map(row => ({
+            fecha: row.fecha,
+            nombre_labor: row.nombre_labor,
+            numero_labores: parseInt(row.numero_labores || 0),
+            cantidad_total: parseFloat(row.cantidad_total || 0),
+            peso_total: parseFloat(row.peso_total || 0)
+        }));
+
+        res.json(historicoFormateado);
     } catch (error) {
         console.error('Error al obtener histórico de labores:', error);
         res.status(500).json({ message: 'Error al obtener histórico de labores', error: error.message });
@@ -277,8 +315,21 @@ exports.getLaboresDetallado = async (req, res) => {
             LIMIT ? OFFSET ?
         `, [...queryParams, parseInt(limit), offset]);
 
+        // Mapear los campos para que coincidan con lo que espera el frontend
+        const datosFormateados = rows.map(row => ({
+            fecha_labor: row.fecha_labor,
+            nombre_labor: row.nombre_labor,
+            nombre_cultivo: row.nombre_cultivo,
+            nombre_lote: row.nombre_lote,
+            trabajador: row.trabajador,
+            cantidad_recolectada: parseFloat(row.cantidad_recolectada || 0),
+            peso_kg: parseFloat(row.peso_kg || 0),
+            costo_aproximado: parseFloat(row.costo_aproximado || 0),
+            usuario_registro: row.usuario_registro
+        }));
+
         res.json({
-            data: rows,
+            data: datosFormateados,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),

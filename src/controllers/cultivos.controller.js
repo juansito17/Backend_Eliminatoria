@@ -7,7 +7,9 @@ exports.getCultivos = async (req, res) => {
         // Mapear los campos de la base de datos a los nombres esperados por el frontend
         const cultivosFormateados = cultivos.map(cultivo => ({
             id: cultivo.id_cultivo,
-            nombre: cultivo.nombre_cultivo
+            nombre: cultivo.nombre_cultivo,
+            descripcion: cultivo.descripcion_cultivo,
+            fecha_creacion: cultivo.fecha_creacion
         }));
         res.json({ cultivos: cultivosFormateados });
     } catch (error) {

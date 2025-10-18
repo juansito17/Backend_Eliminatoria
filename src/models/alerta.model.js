@@ -15,7 +15,7 @@ exports.findById = async (id) => {
 // Crear una nueva alerta
 exports.create = async (id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta) => {
     const [result] = await pool.query(
-        'INSERT INTO alertas (id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO alertas (id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, NOW())',
         [id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta]
     );
     return result.insertId;
