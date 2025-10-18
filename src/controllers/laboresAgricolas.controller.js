@@ -98,6 +98,30 @@ exports.createLaborAgricola = async (req, res) => {
         // Definir ventana de edición para el operario (por ejemplo: 2 horas desde la creación)
         const horaLimiteEdicion = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
 
+        // Validar y normalizar coordenadas GPS si vienen en el payload
+        let normalizedUbic = null;
+        if (ubicacion_gps_punto) {
+          const parseCoord = (u) => {
+            let lat, lon;
+            if (typeof u === 'string') {
+              const parts = u.split(',').map(p => p.trim());
+              lat = parseFloat(parts[0]);
+              lon = parseFloat(parts[1]);
+            } else if (typeof u === 'object') {
+              lat = parseFloat(u.latitude ?? u.lat);
+              lon = parseFloat(u.longitude ?? u.lon);
+            }
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+            // Normalizar a string "lat,lon" con 6 decimales
+            return `${lat.toFixed(6)},${lon.toFixed(6)}`;
+          };
+          normalizedUbic = parseCoord(ubicacion_gps_punto);
+          if (!normalizedUbic) {
+            return res.status(400).json({ message: 'Ubicación GPS inválida. Formato esperado: "lat,lon" o {lat,lon} con coordenadas válidas.' });
+          }
+        }
+
         const id = await LaborAgricola.create(
             id_lote,
             id_cultivo,
@@ -108,8 +132,7 @@ exports.createLaborAgricola = async (req, res) => {
             cantidad_recolectada,
             peso_kg,
             costo_aproximado,
-            horaLimiteEdicion,
-            ubicacion_gps_punto,
+            normalizedUbic,
             observaciones
         );
 
@@ -131,6 +154,29 @@ exports.updateLaborAgricola = async (req, res) => {
         // Si el sistema permite que un administrador cambie el usuario registro, puede ajustarse aquí.
         const idUsuarioRegistro = req.user && req.user.id ? req.user.id : null;
 
+        // Validar y normalizar coordenadas GPS si vienen en el payload
+        let normalizedUbic = null;
+        if (ubicacion_gps_punto) {
+          const parseCoord = (u) => {
+            let lat, lon;
+            if (typeof u === 'string') {
+              const parts = u.split(',').map(p => p.trim());
+              lat = parseFloat(parts[0]);
+              lon = parseFloat(parts[1]);
+            } else if (typeof u === 'object') {
+              lat = parseFloat(u.latitude ?? u.lat);
+              lon = parseFloat(u.longitude ?? u.lon);
+            }
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+            return `${lat.toFixed(6)},${lon.toFixed(6)}`;
+          };
+          normalizedUbic = parseCoord(ubicacion_gps_punto);
+          if (!normalizedUbic) {
+            return res.status(400).json({ message: 'Ubicación GPS inválida. Formato esperado: "lat,lon" o {lat,lon} con coordenadas válidas.' });
+          }
+        }
+
         const affectedRows = await LaborAgricola.update(
             id,
             id_lote,
@@ -142,7 +188,7 @@ exports.updateLaborAgricola = async (req, res) => {
             cantidad_recolectada,
             peso_kg,
             costo_aproximado,
-            ubicacion_gps_punto,
+            normalizedUbic,
             observaciones
         );
         if (affectedRows === 0) {
