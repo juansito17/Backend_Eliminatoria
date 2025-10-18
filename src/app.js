@@ -14,8 +14,8 @@ const authRoutes = require('./routes/auth.routes'); // Importar las rutas de aut
 
 // Middlewares
 app.use(express.json()); // Para parsear JSON en las peticiones
-app.use(cors({ // Configurar CORS para permitir solicitudes desde el frontend
-    origin: 'http://localhost:3000', // Reemplaza con el origen de tu frontend
+app.use(cors({ // Configurar CORS para permitir solicitudes desde cualquier origen (solo desarrollo)
+    origin: true,
     credentials: true
 }));
 

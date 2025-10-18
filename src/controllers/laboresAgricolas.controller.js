@@ -4,39 +4,31 @@ const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 // Obtener todas las labores agrícolas
 exports.getLaboresAgricolas = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const search = req.query.search || '';
-        const cultivoId = req.query.cultivoId || '';
-        const tipoLaborId = req.query.tipoLaborId || '';
-
-        let laboresAgricolas;
-        let totalLabores;
+        const { page = 1, limit = 10, search = '', cultivoId = null, tipoLaborId = null } = req.query;
+        let userId = null;
 
         // Si el usuario es un Operario (rol 3), solo puede ver sus propias labores
         if (req.user.rol === 3) {
-            const result = await LaborAgricola.findAllWithFiltersAndPagination(req.user.id, page, limit, search, cultivoId, tipoLaborId);
-            laboresAgricolas = result.labores;
-            totalLabores = result.total;
-        } else {
-            // Administradores (rol 1) y Supervisores (rol 2) pueden ver todas las labores
-            const result = await LaborAgricola.findAllWithFiltersAndPagination(null, page, limit, search, cultivoId, tipoLaborId);
-            laboresAgricolas = result.labores;
-            totalLabores = result.total;
+            userId = req.user.id;
         }
 
-        const totalPages = Math.ceil(totalLabores / limit);
+        const { labores, totalPages, currentPage } = await LaborAgricola.findAll(
+            search,
+            cultivoId,
+            tipoLaborId,
+            userId,
+            parseInt(page),
+            parseInt(limit)
+        );
 
         // Mapear los campos para que coincidan con lo que espera el frontend
-        const laboresFormateadas = laboresAgricolas.map(labor => ({
+        const laboresFormateadas = labores.map(labor => ({
             id: labor.id_labor,
             fecha: labor.fecha_labor,
             cultivo: labor.nombre_cultivo || 'Sin cultivo', // Usar nombre si está disponible
-            cultivoId: labor.id_cultivo || 0, // Asegurar que sea un número válido
             lote: labor.nombre_lote || 'Sin lote',
             trabajador: labor.nombre_completo || 'Sin trabajador',
             tipoLabor: labor.nombre_labor || 'Sin tipo',
-            tipoLaborId: labor.id_labor_tipo || 0, // Asegurar que sea un número válido
             cantidadRecolectada: labor.cantidad_recolectada,
             peso: labor.peso_kg,
             hora: labor.fecha_labor ? new Date(labor.fecha_labor).toTimeString().slice(0, 5) : '',
@@ -44,12 +36,7 @@ exports.getLaboresAgricolas = async (req, res) => {
             id_usuario_registro: labor.id_usuario_registro
         }));
 
-        res.json({
-            labores: laboresFormateadas,
-            currentPage: page,
-            totalPages: totalPages,
-            totalItems: totalLabores,
-        });
+        res.json({ labores: laboresFormateadas, totalPages, currentPage });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener labores agrícolas', error: error.message });
     }

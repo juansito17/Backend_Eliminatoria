@@ -303,7 +303,7 @@ exports.getLaboresDetallado = async (req, res) => {
                 la.cantidad_recolectada,
                 la.peso_kg,
                 la.costo_aproximado,
-                u.nombre AS usuario_registro
+                u.nombre_usuario AS usuario_registro
             FROM labores_agricolas la
             JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
             JOIN cultivos c ON la.id_cultivo = c.id_cultivo
