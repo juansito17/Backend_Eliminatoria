@@ -70,6 +70,10 @@ exports.getLoteById = async (req, res) => {
    const { id } = req.params;
    const { nombre_lote, area_hectareas, id_cultivo, ubicacion_gps_poligono, id_supervisor } = req.body;
    try {
+    // Si se intenta actualizar el supervisor desde este endpoint, solo Admin (rol 1)
+    if (typeof id_supervisor !== 'undefined' && req.user && req.user.rol !== 1) {
+      return res.status(403).json({ message: 'Solo el Administrador puede asignar o cambiar supervisores de lotes' });
+    }
      const affectedRows = await Lote.update(
        id,
        nombre_lote,

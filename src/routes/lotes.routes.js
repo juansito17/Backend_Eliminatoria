@@ -11,7 +11,7 @@ router.post('/', auth, checkRole([1,2]), lotesController.createLote); // solo Ad
 router.put('/:id', auth, checkRole([1,2]), lotesController.updateLote);
 router.delete('/:id', auth, checkRole([1]), lotesController.deleteLote); // solo Admin
 
-// Asignar supervisor a un lote (Admin o Supervisor)
-router.put('/:id/supervisor', auth, checkRole([1,2]), lotesController.assignSupervisor);
+// Asignar supervisor a un lote (solo Admin)
+router.put('/:id/supervisor', auth, checkRole([1]), lotesController.assignSupervisor);
 
 module.exports = router;
