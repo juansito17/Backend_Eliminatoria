@@ -35,7 +35,16 @@ exports.login = async (req, res) => {
             { expiresIn: '1h' }, // Token expira en 1 hora
             (err, token) => {
                 if (err) throw err;
-                res.json({ token, message: 'Inicio de sesión exitoso' });
+                res.json({ 
+                    token, 
+                    user: {
+                        id: user.id_usuario,
+                        username: user.username,
+                        rol: user.id_rol,
+                        email: user.email
+                    },
+                    message: 'Inicio de sesión exitoso' 
+                });
             }
         );
 
@@ -82,9 +91,17 @@ exports.verifyToken = async (req, res) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey');
         req.user = decoded.user;
-        // Asegúrate de que el user devuelto contenga el username
-        const userWithUsername = await authModel.findUserById(req.user.id); // Asumiendo que authModel tiene findUserById
-        res.json({ user: { ...req.user, username: userWithUsername.username }, message: 'Token válido' });
+        // Asegúrate de que el user devuelto contenga el username y rol
+        const userWithDetails = await authModel.findUserById(req.user.id); // Asumiendo que authModel tiene findUserById
+        res.json({ 
+            user: { 
+                id: req.user.id,
+                username: userWithDetails.username,
+                rol: req.user.rol,
+                email: req.user.email
+            }, 
+            message: 'Token válido' 
+        });
     } catch (error) {
         res.status(401).json({ message: 'Token no es válido', error: error.message });
     }
