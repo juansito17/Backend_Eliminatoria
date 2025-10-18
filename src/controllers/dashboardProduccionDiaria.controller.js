@@ -5,29 +5,68 @@ const { getIo } = require('../socket'); // Importar la instancia de Socket.io
 exports.getDashboardProduccionDiaria = async (req, res) => {
     try {
         // Producción Diaria (ejemplo: suma del peso de las labores de hoy)
-        // Calcular rango de día en la zona local para evitar problemas de zona horaria en la BD
+        // Calcular rango de día en la zona local y convertir a UTC para comparar con timestamps UTC en la BD.
         const now = new Date();
         const startOfDay = new Date(now);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(startOfDay);
         endOfDay.setDate(endOfDay.getDate() + 1);
-        const startStr = startOfDay.toISOString().slice(0, 19).replace('T', ' ');
-        const endStr = endOfDay.toISOString().slice(0, 19).replace('T', ' ');
+
+        const pad = (n) => String(n).padStart(2, '0');
+        const formatSQLDate = (d) =>
+            `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+        // Convertir inicio/fin locales a UTC (la BD almacena timestamps en UTC)
+        const startUTC = new Date(startOfDay.getTime() + startOfDay.getTimezoneOffset() * 60000);
+        const endUTC = new Date(endOfDay.getTime() + endOfDay.getTimezoneOffset() * 60000);
+
+        const startStr = formatSQLDate(startUTC);
+        const endStr = formatSQLDate(endUTC);
 
         const [produccionDiariaResult] = await pool.query(`
             SELECT SUM(peso_kg) AS total_peso_kg
             FROM labores_agricolas
             WHERE fecha_labor >= ? AND fecha_labor < ?;
         `, [startStr, endStr]);
-        const total_peso_kg = produccionDiariaResult[0].total_peso_kg || 0;
+        let total_peso_kg = produccionDiariaResult[0].total_peso_kg || 0;
+
+        // Si no hay datos en el rango calculado, usar la última fecha con registros
+        let fallbackDate = null;
+        if (!total_peso_kg || total_peso_kg === 0) {
+            const [lastDateRow] = await pool.query(`
+                SELECT DATE(fecha_labor) AS fecha_max
+                FROM labores_agricolas
+                ORDER BY fecha_labor DESC
+                LIMIT 1;
+            `);
+            if (lastDateRow && lastDateRow.length && lastDateRow[0].fecha_max) {
+                fallbackDate = lastDateRow[0].fecha_max; // formato 'YYYY-MM-DD'
+                const [lastTotal] = await pool.query(`
+                    SELECT SUM(peso_kg) AS total_peso_kg
+                    FROM labores_agricolas
+                    WHERE DATE(fecha_labor) = ?;
+                `, [fallbackDate]);
+                total_peso_kg = lastTotal[0].total_peso_kg || 0;
+            }
+        }
 
         // Trabajadores Activos (ejemplo: contar trabajadores con labores hoy)
-        const [trabajadoresActivosResult] = await pool.query(`
-            SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
-            FROM labores_agricolas
-            WHERE fecha_labor >= ? AND fecha_labor < ?;
-        `, [startStr, endStr]);
-        const trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
+        let trabajadores_activos = 0;
+        if (fallbackDate) {
+            const [trabajadoresActivosResult] = await pool.query(`
+                SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
+                FROM labores_agricolas
+                WHERE DATE(fecha_labor) = ?;
+            `, [fallbackDate]);
+            trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
+        } else {
+            const [trabajadoresActivosResult] = await pool.query(`
+                SELECT COUNT(DISTINCT id_trabajador) AS trabajadores_activos
+                FROM labores_agricolas
+                WHERE fecha_labor >= ? AND fecha_labor < ?;
+            `, [startStr, endStr]);
+            trabajadores_activos = trabajadoresActivosResult[0].trabajadores_activos || 0;
+        }
 
         // Cultivos Activos (contar todos los cultivos existentes)
         const [cultivosActivosResult] = await pool.query(`
@@ -37,26 +76,50 @@ exports.getDashboardProduccionDiaria = async (req, res) => {
         const cultivos_activos = cultivosActivosResult[0].cultivos_activos || 0;
 
         // Rendimiento por Lote (ejemplo: peso total por lote para el día actual)
-        const [rendimientoPorLoteResult] = await pool.query(`
-            SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
-            FROM labores_agricolas la
-            JOIN lotes l ON la.id_lote = l.id_lote
-            WHERE la.fecha_labor >= ? AND la.fecha_labor < ?
-            GROUP BY l.nombre_lote;
-        `, [startStr, endStr]);
-        // Asegurar que peso_total_lote sea number (el driver devuelve strings para decimales)
-        const rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
-            nombre_lote: item.nombre_lote,
-            peso_total_lote: parseFloat(item.peso_total_lote || 0)
-        }));
+        let rendimiento_por_lote = [];
+        if (fallbackDate) {
+            const [rendimientoPorLoteResult] = await pool.query(`
+                SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
+                FROM labores_agricolas la
+                JOIN lotes l ON la.id_lote = l.id_lote
+                WHERE DATE(la.fecha_labor) = ?
+                GROUP BY l.nombre_lote;
+            `, [fallbackDate]);
+            rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
+                nombre_lote: item.nombre_lote,
+                peso_total_lote: parseFloat(item.peso_total_lote || 0)
+            }));
+        } else {
+            const [rendimientoPorLoteResult] = await pool.query(`
+                SELECT l.nombre_lote, SUM(la.peso_kg) AS peso_total_lote
+                FROM labores_agricolas la
+                JOIN lotes l ON la.id_lote = l.id_lote
+                WHERE la.fecha_labor >= ? AND la.fecha_labor < ?
+                GROUP BY l.nombre_lote;
+            `, [startStr, endStr]);
+            rendimiento_por_lote = rendimientoPorLoteResult.map(item => ({
+                nombre_lote: item.nombre_lote,
+                peso_total_lote: parseFloat(item.peso_total_lote || 0)
+            }));
+        }
 
         // Costo Total Aproximado (ejemplo: suma del costo aproximado de las labores de hoy)
-        const [costoTotalAproximadoResult] = await pool.query(`
-            SELECT SUM(costo_aproximado) AS costo_total_aproximado
-            FROM labores_agricolas
-            WHERE fecha_labor >= ? AND fecha_labor < ?;
-        `, [startStr, endStr]);
-        const costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
+        let costo_total_aproximado = 0;
+        if (fallbackDate) {
+            const [costoTotalAproximadoResult] = await pool.query(`
+                SELECT SUM(costo_aproximado) AS costo_total_aproximado
+                FROM labores_agricolas
+                WHERE DATE(fecha_labor) = ?;
+            `, [fallbackDate]);
+            costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
+        } else {
+            const [costoTotalAproximadoResult] = await pool.query(`
+                SELECT SUM(costo_aproximado) AS costo_total_aproximado
+                FROM labores_agricolas
+                WHERE fecha_labor >= ? AND fecha_labor < ?;
+            `, [startStr, endStr]);
+            costo_total_aproximado = costoTotalAproximadoResult[0].costo_total_aproximado || 0;
+        }
 
         // Definir un rendimiento óptimo por trabajador (ejemplo: 100 kg por trabajador)
         const RENDIMIENTO_OPTIMO_POR_TRABAJADOR = 100; // kg/trabajador
