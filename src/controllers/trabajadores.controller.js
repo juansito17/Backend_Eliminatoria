@@ -1,9 +1,47 @@
+const pool = require('../config/database');
 const Trabajador = require('../models/trabajador.model');
 
-// Obtener todos los trabajadores
+// Obtener todos los trabajadores (filtrado por rol/usuario)
 exports.getTrabajadores = async (req, res) => {
     try {
-        const trabajadores = await Trabajador.findAll();
+        // Si no viene info de usuario, denegar (esta ruta debería estar protegida por auth)
+        if (!req.user || !(req.user.id_usuario || req.user.id) || !req.user.rol) {
+            return res.status(401).json({ message: 'No autenticado o información de usuario incompleta' });
+        }
+
+        const userId = req.user.id_usuario || req.user.id;
+        const userRol = Number(req.user.rol);
+
+        let trabajadores = [];
+
+        if (userRol === 1) {
+            // Admin: todos los trabajadores
+            trabajadores = await Trabajador.findAll();
+        } else if (userRol === 2) {
+            // Supervisor: trabajadores asignados a su cargo (supervisor_trabajador)
+            const [rows] = await pool.query(
+                `SELECT t.id_trabajador, t.nombre_completo
+                 FROM trabajadores t
+                 INNER JOIN supervisor_trabajador st ON st.id_trabajador = t.id_trabajador
+                 WHERE st.id_supervisor = ? AND st.activo = 1 AND t.activo = 1`,
+                [userId]
+            );
+            trabajadores = rows;
+        } else if (userRol === 3) {
+            // Operario: solo su trabajador vinculado
+            const [rows] = await pool.query(
+                `SELECT id_trabajador, nombre_completo
+                 FROM trabajadores
+                 WHERE id_usuario = ? AND activo = 1
+                 LIMIT 1`,
+                [userId]
+            );
+            trabajadores = rows;
+        } else {
+            // Roles desconocidos: devolver vacío por seguridad
+            trabajadores = [];
+        }
+
         // Mapear los campos de la base de datos a los nombres esperados por el frontend
         const trabajadoresFormateados = trabajadores.map(trabajador => ({
             id: trabajador.id_trabajador,

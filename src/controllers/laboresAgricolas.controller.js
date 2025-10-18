@@ -90,10 +90,18 @@ exports.getLaborAgricolaById = async (req, res) => {
 
  // Crear una nueva labor agrícola
 exports.createLaborAgricola = async (req, res) => {
-    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
+    const { id_lote, id_cultivo, id_trabajador: bodyIdTrabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
     try {
+        // Información usuario del token
+        const userId = req.user && (req.user.id_usuario || req.user.id) ? (req.user.id_usuario || req.user.id) : null;
+        const userRol = Number(req.user && req.user.rol);
+
+        if (!userId || !userRol) {
+            return res.status(401).json({ message: 'No autenticado o información de usuario incompleta' });
+        }
+
         // Forzar el usuario que registra a partir del token (evitar suplantación)
-        const idUsuarioRegistro = req.user && (req.user.id_usuario || req.user.id) ? (req.user.id_usuario || req.user.id) : null;
+        const idUsuarioRegistro = userId;
 
         // Definir ventana de edición para el operario (por ejemplo: 2 horas desde la creación)
         const horaLimiteEdicion = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
@@ -122,6 +130,33 @@ exports.createLaborAgricola = async (req, res) => {
           }
         }
 
+        // Reglas adicionales por rol (defensa en profundidad)
+        let id_trabajador = bodyIdTrabajador;
+        if (userRol === 1) {
+            // Admin: puede crear para cualquier trabajador (si proporciona)
+        } else if (userRol === 3) {
+            // Operario: solo puede crear para sí mismo -> obtener id_trabajador vinculado y forzar
+            const [rows] = await pool.query('SELECT id_trabajador FROM trabajadores WHERE id_usuario = ? AND activo = 1 LIMIT 1', [userId]);
+            if (!rows.length) {
+                return res.status(403).json({ message: 'Operario no vinculado a trabajador. Contacte al administrador.' });
+            }
+            const myTrabajadorId = rows[0].id_trabajador;
+            // Forzar que la labor sea para sí mismo
+            id_trabajador = myTrabajadorId;
+        } else if (userRol === 2) {
+            // Supervisor: debe especificar id_trabajador y pertenecer a su equipo
+            if (!bodyIdTrabajador) {
+                return res.status(400).json({ message: 'id_trabajador es requerido para crear una labor.' });
+            }
+            const [rows] = await pool.query('SELECT 1 FROM supervisor_trabajador WHERE id_supervisor = ? AND id_trabajador = ? AND activo = 1 LIMIT 1', [userId, bodyIdTrabajador]);
+            if (!rows.length) {
+                return res.status(403).json({ message: 'Supervisor solo puede crear labores para trabajadores a su cargo.' });
+            }
+            id_trabajador = bodyIdTrabajador;
+        } else {
+            return res.status(403).json({ message: 'Rol no permitido para crear labores' });
+        }
+
         const id = await LaborAgricola.create(
             id_lote,
             id_cultivo,
@@ -147,12 +182,19 @@ exports.createLaborAgricola = async (req, res) => {
  // Actualizar una labor agrícola existente
 exports.updateLaborAgricola = async (req, res) => {
     const { id } = req.params;
-    const { id_lote, id_cultivo, id_trabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
+    const { id_lote, id_cultivo, id_trabajador: bodyIdTrabajador, id_labor_tipo, /* id_usuario_registro, */ fecha_labor, cantidad_recolectada, peso_kg, costo_aproximado, ubicacion_gps_punto, observaciones } = req.body;
 
     try {
+        // Información usuario del token
+        const userId = req.user && (req.user.id_usuario || req.user.id) ? (req.user.id_usuario || req.user.id) : null;
+        const userRol = Number(req.user && req.user.rol);
+
+        if (!userId || !userRol) {
+            return res.status(401).json({ message: 'No autenticado o información de usuario incompleta' });
+        }
+
         // Forzar que el usuario de registro sea el usuario autenticado (evitar suplantación).
-        // Si el sistema permite que un administrador cambie el usuario registro, puede ajustarse aquí.
-        const idUsuarioRegistro = req.user && req.user.id ? req.user.id : null;
+        const idUsuarioRegistro = userId;
 
         // Validar y normalizar coordenadas GPS si vienen en el payload
         let normalizedUbic = null;
@@ -177,11 +219,60 @@ exports.updateLaborAgricola = async (req, res) => {
           }
         }
 
+        // Verificaciones de permiso adicionales (defensa en profundidad)
+        // Obtener labor para comprobar propietario / trabajador
+        const [laborRows] = await pool.query('SELECT id_labor, id_trabajador, id_usuario_registro, hora_limite_edicion FROM labores_agricolas WHERE id_labor = ? LIMIT 1', [id]);
+        if (!laborRows.length) {
+            return res.status(404).json({ message: 'Labor agrícola no encontrada' });
+        }
+        const labor = laborRows[0];
+
+        if (userRol === 3) {
+            // Operario: solo modificar sus propias labores y dentro de ventana
+            const [myRows] = await pool.query('SELECT id_trabajador FROM trabajadores WHERE id_usuario = ? AND activo = 1 LIMIT 1', [userId]);
+            if (!myRows.length) {
+                return res.status(403).json({ message: 'Operario no vinculado a trabajador. Contacte al administrador.' });
+            }
+            const myTrabajadorId = myRows[0].id_trabajador;
+            if (Number(labor.id_trabajador) !== Number(myTrabajadorId)) {
+                return res.status(403).json({ message: 'Operario solo puede modificar sus propias labores.' });
+            }
+            // Ventana de edición
+            if (labor.hora_limite_edicion) {
+                const ahora = new Date();
+                const limite = new Date(labor.hora_limite_edicion);
+                if (ahora > limite) {
+                    return res.status(403).json({ message: 'Periodo de edición expirado para esta labor.' });
+                }
+            } else {
+                return res.status(403).json({ message: 'Edición por operario no permitida en esta labor (sin ventana definida).' });
+            }
+            // Evitar que el operario cambie el id_trabajador
+            if (bodyIdTrabajador && Number(bodyIdTrabajador) !== Number(myTrabajadorId)) {
+                return res.status(403).json({ message: 'Operario no puede reasignar la labor a otro trabajador.' });
+            }
+        }
+
+        if (userRol === 2) {
+            // Supervisor: solo si el trabajador pertenece a su equipo. Si está intentando reasignar, verificar destino
+            const [asignRows] = await pool.query('SELECT 1 FROM supervisor_trabajador WHERE id_supervisor = ? AND id_trabajador = ? AND activo = 1 LIMIT 1', [userId, labor.id_trabajador]);
+            if (!asignRows.length) {
+                return res.status(403).json({ message: 'Supervisor no tiene permisos sobre la labor especificada.' });
+            }
+            if (bodyIdTrabajador && Number(bodyIdTrabajador) !== Number(labor.id_trabajador)) {
+                // Verificar que el nuevo trabajador también pertenezca al supervisor
+                const [destRows] = await pool.query('SELECT 1 FROM supervisor_trabajador WHERE id_supervisor = ? AND id_trabajador = ? AND activo = 1 LIMIT 1', [userId, bodyIdTrabajador]);
+                if (!destRows.length) {
+                    return res.status(403).json({ message: 'No puede reasignar la labor a un trabajador fuera de su equipo.' });
+                }
+            }
+        }
+
         const affectedRows = await LaborAgricola.update(
             id,
             id_lote,
             id_cultivo,
-            id_trabajador,
+            bodyIdTrabajador || labor.id_trabajador,
             id_labor_tipo,
             idUsuarioRegistro,
             fecha_labor,
@@ -195,7 +286,7 @@ exports.updateLaborAgricola = async (req, res) => {
             return res.status(404).json({ message: 'Labor agrícola no encontrada para actualizar' });
         }
         const io = getIo();
-        io.emit('actualizacion-labor-agricola', { id, id_lote, id_cultivo, id_trabajador, fecha_labor, cantidad_recolectada, peso_kg }); // Emitir evento WebSocket
+        io.emit('actualizacion-labor-agricola', { id, id_lote, id_cultivo, id_trabajador: bodyIdTrabajador || labor.id_trabajador, fecha_labor, cantidad_recolectada, peso_kg }); // Emitir evento WebSocket
         res.json({ message: 'Labor agrícola actualizada exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al actualizar labor agrícola', error: error.message });
