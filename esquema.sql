@@ -1,17 +1,17 @@
 -- #############################################################################
--- ## Esquema de Base de Datos para el Sistema de Agricultura de Precisiรณn    ##
+-- ## Esquema de Base de Datos para el Sistema de Agricultura de Precisión    ##
 -- ## Base de Datos: agricultura_db                                           ##
 -- ## Motor: MySQL (InnoDB)                                                   ##
 -- #############################################################################
 
--- --- Creaciรณn de la Base de Datos ---
+-- --- Creación de la Base de Datos ---
 DROP DATABASE IF EXISTS agricultura_db;
 CREATE DATABASE IF NOT EXISTS agricultura_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE agricultura_db;
 
 -- -----------------------------------------------------
 -- Tabla: roles
--- Descripciรณn: Almacena los roles de los usuarios del sistema (Administrador, Supervisor, Operario).
+-- Descripción: Almacena los roles de los usuarios del sistema (Administrador, Supervisor, Operario).
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS roles (
   id_rol INT AUTO_INCREMENT PRIMARY KEY,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS roles (
 
 -- -----------------------------------------------------
 -- Tabla: usuarios
--- Descripciรณn: Gestiona la informaciรณn de los usuarios y sus credenciales.
+-- Descripción: Gestiona la información de los usuarios y sus credenciales.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS usuarios (
   id_usuario INT AUTO_INCREMENT PRIMARY KEY,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 -- -----------------------------------------------------
 -- Tabla: cultivos
--- Descripciรณn: Catรกlogo de los tipos de cultivo.
+-- Descripción: Catálogo de los tipos de cultivo.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS cultivos (
   id_cultivo INT AUTO_INCREMENT PRIMARY KEY,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS cultivos (
 
 -- -----------------------------------------------------
 -- Tabla: lotes
--- Descripciรณn: Define los lotes o parcelas de la finca.
+-- Descripción: Define los lotes o parcelas de la finca.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS lotes (
   id_lote INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,15 +59,15 @@ CREATE TABLE IF NOT EXISTS lotes (
   nombre_lote VARCHAR(100) NOT NULL,
   ubicacion_gps_poligono JSON, -- Para almacenar coordenadas del lote
   area_hectareas DECIMAL(10, 2),
-  id_supervisor INT NULL, -- Nueva columna para el supervisor
+  id_supervisor INT NULL,
   fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (id_cultivo) REFERENCES cultivos(id_cultivo),
-  FOREIGN KEY (id_supervisor) REFERENCES usuarios(id_usuario) -- Clave foránea para el supervisor
+  FOREIGN KEY (id_supervisor) REFERENCES usuarios(id_usuario)
 );
 
 -- -----------------------------------------------------
 -- Tabla: trabajadores
--- Descripciรณn: Informaciรณn de los operarios o trabajadores de campo.
+-- Descripción: Información de los operarios o trabajadores de campo.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS trabajadores (
   id_trabajador INT AUTO_INCREMENT PRIMARY KEY,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS trabajadores (
 
 -- -----------------------------------------------------
 -- Tabla: labores_tipos
--- Descripciรณn: Catรกlogo de los tipos de labores agrรญcolas (ej. Cosecha, Siembra, Riego).
+-- Descripción: Catálogo de los tipos de labores agrícolas (ej. Cosecha, Siembra, Riego).
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS labores_tipos (
   id_labor_tipo INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS labores_tipos (
 
 -- -----------------------------------------------------
 -- Tabla: labores_agricolas
--- Descripciรณn: Tabla principal para registrar todas las actividades de campo.
+-- Descripción: Tabla principal para registrar todas las actividades de campo.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS labores_agricolas (
   id_labor INT AUTO_INCREMENT PRIMARY KEY,
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS labores_agricolas (
 
 -- -----------------------------------------------------
 -- Tabla: alertas
--- Descripciรณn: Registra notificaciones automรกticas sobre desviaciones significativas.
+-- Descripción: Registra notificaciones automáticas sobre desviaciones significativas.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS alertas (
   id_alerta INT AUTO_INCREMENT PRIMARY KEY,
@@ -134,12 +134,12 @@ CREATE TABLE IF NOT EXISTS alertas (
 
 -- -----------------------------------------------------
 -- Vistas o Tablas Agregadas para el Dashboard (Opcional, para rendimiento)
--- Estas tablas se podrรญan actualizar con triggers o un proceso batch.
+-- Estas tablas se podrían actualizar con triggers o un proceso batch.
 -- -----------------------------------------------------
 
 -- -----------------------------------------------------
 -- Tabla: dashboard_produccion_diaria
--- Descripciรณn: Almacena datos pre-calculados para el dashboard, optimizando consultas.
+-- Descripción: Almacena datos pre-calculados para el dashboard, optimizando consultas.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS dashboard_produccion_diaria (
   id INT AUTO_INCREMENT PRIMARY KEY,
