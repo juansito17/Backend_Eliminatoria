@@ -6,8 +6,12 @@ exports.getLaboresTipos = async (req, res) => {
         const laboresTipos = await LaborTipo.findAll();
         // Mapear los campos de la base de datos a los nombres esperados por el frontend
         const tiposLaborFormateados = laboresTipos.map(tipo => ({
-            id: tipo.id_labor_tipo,
-            nombre: tipo.nombre_labor
+            id_labor_tipo: tipo.id_labor_tipo,
+            nombre_labor: tipo.nombre_labor,
+            descripcion_labor: tipo.descripcion_labor,
+            requiere_cantidad: tipo.requiere_cantidad,
+            requiere_peso: tipo.requiere_peso,
+            fecha_creacion: tipo.fecha_creacion
         }));
         res.json({ tiposLabor: tiposLaborFormateados });
     } catch (error) {
