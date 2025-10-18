@@ -259,8 +259,20 @@ exports.createAlerta = async (req, res) => {
     const { id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta } = req.body;
     try {
         const id = await Alerta.create(id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta);
+        // Obtener la alerta recién creada para enviar los campos completos (incluida fecha_creacion)
+        const alerta = await Alerta.findById(id);
+        const alertaFormateada = {
+            id: alerta.id_alerta,
+            id_labor: alerta.id_labor,
+            id_lote: alerta.id_lote,
+            tipo_alerta: alerta.tipo_alerta,
+            descripcion: alerta.descripcion,
+            nivel_severidad: alerta.nivel_severidad,
+            resuelta: alerta.resuelta,
+            fecha_creacion: alerta.fecha_creacion
+        };
         const io = getIo();
-        io.emit('nueva-alerta', { id, id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta }); // Emitir evento WebSocket
+        io.emit('nueva-alerta', alertaFormateada); // Emitir evento WebSocket con datos completos
         res.status(201).json({ message: 'Alerta creada exitosamente', id });
     } catch (error) {
         res.status(500).json({ message: 'Error al crear alerta', error: error.message });
@@ -277,8 +289,23 @@ exports.updateAlerta = async (req, res) => {
         if (affectedRows === 0) {
             return res.status(404).json({ message: 'Alerta no encontrada para actualizar' });
         }
+        // Recuperar la alerta actualizada para emitirla completa
+        const alerta = await Alerta.findById(id);
+        if (!alerta) {
+            return res.status(404).json({ message: 'Alerta no encontrada después de actualizar' });
+        }
+        const alertaFormateada = {
+            id: alerta.id_alerta,
+            id_labor: alerta.id_labor,
+            id_lote: alerta.id_lote,
+            tipo_alerta: alerta.tipo_alerta,
+            descripcion: alerta.descripcion,
+            nivel_severidad: alerta.nivel_severidad,
+            resuelta: alerta.resuelta,
+            fecha_creacion: alerta.fecha_creacion
+        };
         const io = getIo();
-        io.emit('actualizacion-alerta', { id, id_labor, id_lote, tipo_alerta, descripcion, nivel_severidad, resuelta }); // Emitir evento WebSocket
+        io.emit('actualizacion-alerta', alertaFormateada); // Emitir evento WebSocket con datos completos
         res.json({ message: 'Alerta actualizada exitosamente' });
     } catch (error) {
         res.status(500).json({ message: 'Error al actualizar alerta', error: error.message });
