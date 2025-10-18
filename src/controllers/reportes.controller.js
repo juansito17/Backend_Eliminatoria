@@ -343,9 +343,10 @@ exports.getLaboresDetallado = async (req, res) => {
     }
 };
 
-// Generar reporte de labores agrícolas en PDF
+ // Generar reporte de labores agrícolas en PDF
 exports.generateLaboresPdf = async (req, res) => {
     try {
+        // Obtener datos
         const [labores] = await pool.query(`
             SELECT
                 la.fecha_labor,
@@ -356,7 +357,7 @@ exports.generateLaboresPdf = async (req, res) => {
                 la.cantidad_recolectada,
                 la.peso_kg,
                 la.costo_aproximado,
-                u.nombre AS usuario_registro
+                u.nombre_usuario AS usuario_registro
             FROM labores_agricolas la
             JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
             JOIN cultivos c ON la.id_cultivo = c.id_cultivo
@@ -366,29 +367,167 @@ exports.generateLaboresPdf = async (req, res) => {
             ORDER BY la.fecha_labor DESC;
         `);
 
-        const doc = new PDFDocument();
+        // Crear documento PDF con márgenes y tamaño A4
+        const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+
         let filename = 'reporte_labores_agricolas.pdf';
-        // Stripping special characters
         filename = encodeURIComponent(filename);
         res.setHeader('Content-disposition', 'attachment; filename="' + filename + '"');
         res.setHeader('Content-type', 'application/pdf');
 
-        doc.fontSize(16).text('Reporte de Labores Agrícolas', { align: 'center' });
-        doc.moveDown();
+        // Opcional: agregar logo si existe en /public/logo.png
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const logoPath = path.join(__dirname, '..', '..', 'public', 'logo.png');
+            if (fs.existsSync(logoPath)) {
+                doc.image(logoPath, doc.page.width - 120, 30, { width: 80, height: 40 });
+            }
+        } catch (e) {
+            // Ignorar si no hay logo o falla al leer
+        }
 
-        labores.forEach(labor => {
-            doc.fontSize(12).text(`Fecha: ${labor.fecha_labor.toLocaleDateString()}`);
-            doc.text(`Labor: ${labor.nombre_labor}`);
-            doc.text(`Cultivo: ${labor.nombre_cultivo}`);
-            doc.text(`Lote: ${labor.nombre_lote}`);
-            doc.text(`Trabajador: ${labor.trabajador}`);
-            doc.text(`Cantidad Recolectada: ${labor.cantidad_recolectada}`);
-            doc.text(`Peso (kg): ${labor.peso_kg}`);
-            doc.text(`Costo Aproximado: ${labor.costo_aproximado}`);
-            doc.text(`Registrado por: ${labor.usuario_registro}`);
-            doc.moveDown();
+        // Header
+        doc
+            .fillColor('#0f172a')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text('Sistema Agrícola Inteligente', doc.page.margins.left, doc.y, { align: 'left' });
+
+        // Subheader: pequeño indent para separarlo visualmente del borde
+        const subheaderIndent = doc.page.margins.left + 12;
+        doc
+            .fontSize(12)
+            .font('Helvetica')
+            .fillColor('#475569')
+            .text('Reporte de Labores Agrícolas', subheaderIndent, doc.y + 6, { align: 'left' });
+
+        const generatedAt = new Date();
+        doc.fontSize(10).fillColor('#6b7280').text(`Generado: ${generatedAt.toLocaleString()}`, { align: 'right' });
+
+        doc.moveDown(1.2);
+
+        // Tabla: definir posiciones y anchos
+        const tableTop = doc.y + 5;
+        const columnWidths = {
+            fecha: 80,
+            labor: 100,
+            cultivo: 90,
+            lote: 80,
+            trabajador: 110,
+            cantidad: 70,
+            peso: 60,
+            costo: 70
+        };
+
+        // Dibujar encabezado de tabla
+        doc
+            .font('Helvetica-Bold')
+            .fontSize(10)
+            .fillColor('#0f172a');
+
+        let x = doc.page.margins.left;
+        const headerY = tableTop;
+        doc.text('Fecha', x, headerY, { width: columnWidths.fecha, align: 'left' });
+        x += columnWidths.fecha;
+        doc.text('Labor', x, headerY, { width: columnWidths.labor, align: 'left' });
+        x += columnWidths.labor;
+        doc.text('Cultivo', x, headerY, { width: columnWidths.cultivo, align: 'left' });
+        x += columnWidths.cultivo;
+        doc.text('Lote', x, headerY, { width: columnWidths.lote, align: 'left' });
+        x += columnWidths.lote;
+        doc.text('Trabajador', x, headerY, { width: columnWidths.trabajador, align: 'left' });
+        x += columnWidths.trabajador;
+        doc.text('Cant.', x, headerY, { width: columnWidths.cantidad, align: 'right' });
+        x += columnWidths.cantidad;
+        doc.text('Peso', x, headerY, { width: columnWidths.peso, align: 'right' });
+        x += columnWidths.peso;
+        doc.text('Costo', x, headerY, { width: columnWidths.costo, align: 'right' });
+
+        // Línea separadora
+        doc.moveTo(doc.page.margins.left, headerY + 16).lineTo(doc.page.width - doc.page.margins.right, headerY + 16).strokeColor('#e5e7eb').stroke();
+
+        // Reset fuente para filas
+        doc.font('Helvetica').fontSize(10).fillColor('#111827');
+
+        let y = headerY + 22;
+        const rowHeight = 20;
+        labores.forEach((labor, idx) => {
+            // Paginar si se sale del área util de la página
+                if (y + rowHeight > doc.page.height - doc.page.margins.bottom - 50) {
+                // Añadir nueva página y volver a dibujar encabezado de forma consistente
+                doc.addPage();
+
+                // volver a dibujar encabezado en nueva página usando una posición base consistente
+                doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a');
+                x = doc.page.margins.left;
+                const headerYNew = doc.y + 10;
+
+                doc.text('Fecha', x, headerYNew, { width: columnWidths.fecha, align: 'left' });
+                x += columnWidths.fecha;
+                doc.text('Labor', x, headerYNew, { width: columnWidths.labor, align: 'left' });
+                x += columnWidths.labor;
+                doc.text('Cultivo', x, headerYNew, { width: columnWidths.cultivo, align: 'left' });
+                x += columnWidths.cultivo;
+                doc.text('Lote', x, headerYNew, { width: columnWidths.lote, align: 'left' });
+                x += columnWidths.lote;
+                doc.text('Trabajador', x, headerYNew, { width: columnWidths.trabajador, align: 'left' });
+                x += columnWidths.trabajador;
+                doc.text('Cant.', x, headerYNew, { width: columnWidths.cantidad, align: 'right' });
+                x += columnWidths.cantidad;
+                doc.text('Peso', x, headerYNew, { width: columnWidths.peso, align: 'right' });
+                x += columnWidths.peso;
+                doc.text('Costo', x, headerYNew, { width: columnWidths.costo, align: 'right' });
+
+                // Línea separadora usando mismas coordenadas que el encabezado original
+                const lineY = headerYNew + 16;
+                doc.moveTo(doc.page.margins.left, lineY).lineTo(doc.page.width - doc.page.margins.right, lineY).strokeColor('#e5e7eb').stroke();
+
+                // Posicionar y para las filas debajo del encabezado
+                y = headerYNew + 22;
+                doc.font('Helvetica').fontSize(10).fillColor('#111827');
+            }
+
+            // Alternar fondo de fila
+            if (idx % 2 === 0) {
+                doc.rect(doc.page.margins.left, y - 2, doc.page.width - doc.page.margins.left - doc.page.margins.right, rowHeight).fillOpacity(0.03).fill('#000000').fillOpacity(1);
+            }
+
+            x = doc.page.margins.left;
+            const fechaText = labor.fecha_labor ? new Date(labor.fecha_labor).toLocaleDateString() : '';
+            doc.fillColor('#111827').text(fechaText, x, y, { width: columnWidths.fecha, align: 'left' });
+            x += columnWidths.fecha;
+            doc.text(labor.nombre_labor || '', x, y, { width: columnWidths.labor, align: 'left' });
+            x += columnWidths.labor;
+            doc.text(labor.nombre_cultivo || '', x, y, { width: columnWidths.cultivo, align: 'left' });
+            x += columnWidths.cultivo;
+            doc.text(labor.nombre_lote || '', x, y, { width: columnWidths.lote, align: 'left' });
+            x += columnWidths.lote;
+            doc.text(labor.trabajador || '', x, y, { width: columnWidths.trabajador, align: 'left' });
+            x += columnWidths.trabajador;
+            doc.text(String(labor.cantidad_recolectada || 0), x, y, { width: columnWidths.cantidad, align: 'right' });
+            x += columnWidths.cantidad;
+            doc.text(String(labor.peso_kg || 0), x, y, { width: columnWidths.peso, align: 'right' });
+            x += columnWidths.peso;
+            doc.text(String(labor.costo_aproximado || 0), x, y, { width: columnWidths.costo, align: 'right' });
+
+            // Restaurar relleno a blanco para siguientes elementos
+            doc.fillColor('#111827');
+            y += rowHeight;
         });
 
+        // Pie de página: número de página
+        const pageCount = doc.bufferedPageRange().count;
+        for (let i = 0; i < pageCount; i++) {
+            doc.switchToPage(i);
+            const bottom = doc.page.height - doc.page.margins.bottom + 10;
+            doc.fontSize(9).fillColor('#6b7280').text(`Página ${i + 1} de ${pageCount}`, doc.page.margins.left, bottom, {
+                align: 'center',
+                width: doc.page.width - doc.page.margins.left - doc.page.margins.right
+            });
+        }
+
+        // Emitir PDF al cliente
         doc.pipe(res);
         doc.end();
 
@@ -411,7 +550,7 @@ exports.generateLaboresExcel = async (req, res) => {
                 la.cantidad_recolectada,
                 la.peso_kg,
                 la.costo_aproximado,
-                u.nombre AS usuario_registro
+                u.nombre_usuario AS usuario_registro
             FROM labores_agricolas la
             JOIN labores_tipos lt ON la.id_labor_tipo = lt.id_labor_tipo
             JOIN cultivos c ON la.id_cultivo = c.id_cultivo
