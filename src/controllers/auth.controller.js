@@ -59,6 +59,11 @@ exports.register = async (req, res) => {
     const { username, email, password, nombre, apellido } = req.body;
 
     try {
+        // Validación de campos requeridos
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: 'Usuario, email y contraseña son requeridos' });
+        }
+
         // 1. Verificar si el usuario ya existe
         let user = await authModel.findUserByEmail(email);
         if (user) {
@@ -69,13 +74,13 @@ exports.register = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // 3. Crear el nuevo usuario
+        // 3. Crear el nuevo usuario (nombre y apellido son opcionales)
         const newUserId = await authModel.createUser(username, email, passwordHash, nombre, apellido);
 
         res.status(201).json({ message: 'Usuario registrado exitosamente', userId: newUserId });
 
     } catch (error) {
-        console.error(error.message);
+        console.error('Error al registrar usuario:', error);
         res.status(500).json({ message: 'Error interno del servidor al registrar usuario', error: error.message });
     }
 };
